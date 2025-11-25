@@ -1,6 +1,6 @@
 plugins {
-    id 'com.github.johnrengelman.shadow' version '7.1.2'
-    id 'org.jetbrains.kotlin.jvm' version '1.9.23'
+    id 'com.github.johnrengelman.shadow' version '8.1.1'
+    id 'org.jetbrains.kotlin.jvm' version '2.2.0'
     id 'maven-publish'
 }
 
@@ -13,14 +13,13 @@ repositories {
         name 'm2-dv8tion'
     }
     mavenCentral()
-    jcenter()
     maven { url 'https://jitpack.io' }
 }
 
 dependencies {
-    def kotlinVersion = '1.9.23'
-    def coroutinesVersion = '1.6.4'
-    def jdaVersion = '5.3.2'
+    def kotlinVersion = '2.2.0'
+    def coroutinesVersion = '1.10.0'
+    def jdaVersion = '6.1.2'
 
     implementation "org.jetbrains.kotlinx:kotlinx-coroutines-core:$coroutinesVersion"
     implementation "org.jetbrains.kotlinx:kotlinx-coroutines-jdk8:$coroutinesVersion"
@@ -33,7 +32,12 @@ dependencies {
 }
 
 compileKotlin {
-    kotlinOptions.jvmTarget = '1.8'
+    kotlinOptions.jvmTarget = '17'
+}
+
+java {
+    sourceCompatibility = JavaVersion.VERSION_17
+    targetCompatibility = JavaVersion.VERSION_17
 }
 
 String getBuildVersion() {

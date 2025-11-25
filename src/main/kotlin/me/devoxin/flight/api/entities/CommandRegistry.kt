@@ -8,6 +8,8 @@ import me.devoxin.flight.internal.entities.Jar
 import me.devoxin.flight.internal.utils.Indexer
 import net.dv8tion.jda.api.JDA
 import net.dv8tion.jda.api.entities.Guild
+import net.dv8tion.jda.api.interactions.IntegrationType
+import net.dv8tion.jda.api.interactions.InteractionContextType
 import net.dv8tion.jda.api.interactions.commands.build.CommandData
 import net.dv8tion.jda.api.interactions.commands.build.Commands
 import net.dv8tion.jda.api.interactions.commands.build.OptionData
@@ -38,8 +40,12 @@ class CommandRegistry : HashMap<String, CommandFunction>() {
         }
 
         val data = Commands.slash(command.name, command.properties.description)
-            .setGuildOnly(command.properties.guildOnly)
             .setNSFW(command.properties.nsfw)
+
+        if (command.properties.guildOnly) {
+            data.setContexts(InteractionContextType.GUILD)
+            data.setIntegrationTypes(IntegrationType.GUILD_INSTALL)
+        }
 
         if (command.subcommands.isNotEmpty()) {
             for (sc in command.subcommands.values.toSet()) {
