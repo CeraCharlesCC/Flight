@@ -13,7 +13,6 @@ repositories {
         name 'm2-dv8tion'
     }
     mavenCentral()
-    jcenter()
     maven { url 'https://jitpack.io' }
 }
 
@@ -34,6 +33,11 @@ dependencies {
 
 compileKotlin {
     kotlinOptions.jvmTarget = '17'
+}
+
+java {
+    sourceCompatibility = JavaVersion.VERSION_17
+    targetCompatibility = JavaVersion.VERSION_17
 }
 
 String getBuildVersion() {
