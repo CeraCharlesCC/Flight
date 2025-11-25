@@ -42,7 +42,6 @@ class CommandRegistry : HashMap<String, CommandFunction>() {
         val data = Commands.slash(command.name, command.properties.description)
             .setNSFW(command.properties.nsfw)
 
-        // In JDA 6.x, setGuildOnly is replaced by setContexts and setIntegrationTypes
         if (command.properties.guildOnly) {
             data.setContexts(InteractionContextType.GUILD)
             data.setIntegrationTypes(IntegrationType.GUILD_INSTALL)
