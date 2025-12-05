@@ -197,7 +197,7 @@ class MessageContext(
         var content = str
             .replace("@everyone", "@еveryone") // first 'e' is a Cyrillic 'е'
             .replace("@here", "@hеre") // first 'e' is a Cyrillic 'е'
-        val matcher = mentionPattern.matcher(str)
+        val matcher = mentionPattern.matcher(content)
 
         while (matcher.find()) {
             val entityType = matcher.group("type")
