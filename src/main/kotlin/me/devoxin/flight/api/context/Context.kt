@@ -24,6 +24,7 @@ interface Context {
      */
     val asMessageContext: MessageContext?
         get() = this as? MessageContext
+
     /**
      * The current Context instance as a SlashContext instance,
      * if contextType is [ContextType.SLASH], otherwise null.
@@ -155,7 +156,7 @@ interface Context {
      *
      * @throws java.util.concurrent.TimeoutException
      */
-    fun <T: Event> waitFor(event: Class<T>, predicate: (T) -> Boolean, timeout: Long): CompletableFuture<T> {
+    fun <T : Event> waitFor(event: Class<T>, predicate: (T) -> Boolean, timeout: Long): CompletableFuture<T> {
         return commandClient.waitFor(event, predicate, timeout)
     }
 }

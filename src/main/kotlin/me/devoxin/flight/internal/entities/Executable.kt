@@ -11,7 +11,8 @@ import net.dv8tion.jda.api.interactions.commands.OptionType
 import java.util.concurrent.ExecutorService
 import kotlin.reflect.KFunction
 import kotlin.reflect.KParameter
-import kotlin.reflect.full.*
+import kotlin.reflect.full.callSuspendBy
+import kotlin.reflect.full.instanceParameter
 
 abstract class Executable(
     val name: String,
@@ -39,7 +40,7 @@ abstract class Executable(
                 throw IllegalStateException("Missing option for argument ${argument.name}")
             }
 
-            mapping += if (option.type == OptionType.INTEGER && (argument.type == Integer::class.java || argument.type == java.lang.Integer::class.java)) {
+            mapping += if (option.type == OptionType.INTEGER && (argument.type == Integer::class.java || argument.type == Integer::class.java)) {
                 val (param, value) = argument.getEntityFromOptionMapping(option)
                 @Suppress("PLATFORM_CLASS_MAPPED_TO_KOTLIN")
                 param to (value as java.lang.Long).toInt()
@@ -51,7 +52,12 @@ abstract class Executable(
         return mapping
     }
 
-    open fun execute(ctx: Context, args: HashMap<KParameter, Any?>, complete: (Boolean, Throwable?) -> Unit, executor: ExecutorService?) {
+    open fun execute(
+        ctx: Context,
+        args: HashMap<KParameter, Any?>,
+        complete: (Boolean, Throwable?) -> Unit,
+        executor: ExecutorService?
+    ) {
         method.instanceParameter?.let { args[it] = cog }
         args[contextParameter] = ctx
 

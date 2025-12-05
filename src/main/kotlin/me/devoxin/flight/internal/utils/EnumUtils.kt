@@ -29,9 +29,9 @@ object EnumUtils {
 
         // Find non-synthetic, non-enum fields (i.e., declared properties)
         val propertyFields =
-                enumClass.declaredFields.filter { field ->
-                    !field.isEnumConstant && !field.isSynthetic && field.name != "\$VALUES"
-                }
+            enumClass.declaredFields.filter { field ->
+                !field.isEnumConstant && !field.isSynthetic && field.name != "\$VALUES"
+            }
 
         // If there's exactly one String property, use its value as the display name
         val singleStringField = propertyFields.singleOrNull { it.type == String::class.java }
@@ -63,7 +63,7 @@ object EnumUtils {
 
         // Try to match by display name
         val byDisplayName =
-                constants.find { getEnumDisplayName(it).equals(input, ignoreCase = true) }
+            constants.find { getEnumDisplayName(it).equals(input, ignoreCase = true) }
         if (byDisplayName != null) return byDisplayName
 
         return null
