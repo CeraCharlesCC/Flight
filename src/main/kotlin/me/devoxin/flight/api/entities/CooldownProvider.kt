@@ -118,7 +118,7 @@ interface CooldownProvider {
      *        If the bucket type is GUILD, this will be the guild id.
      *        If the bucket type is GLOBAL, this will be -1.
      *
-     * @param bucket
+     * @param bucketType
      *        The type of bucket the cool-down belongs to.
      *        USER, GUILD, GLOBAL
      *
@@ -128,5 +128,5 @@ interface CooldownProvider {
      *       The command that was invoked.
      *
      */
-    fun tryAcquire(id: Long, bucket: BucketType, time: Long, command: CommandFunction): Boolean
+    fun tryAcquire(id: Long, bucketType: BucketType, time: Long, command: CommandFunction): Boolean
 }

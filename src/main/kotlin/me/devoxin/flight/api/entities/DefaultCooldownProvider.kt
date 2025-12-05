@@ -11,11 +11,11 @@ class DefaultCooldownProvider : CooldownProvider {
 
     override fun tryAcquire(
         id: Long,
-        bucket: BucketType,
+        bucketType: BucketType,
         time: Long,
         command: CommandFunction
     ): Boolean {
-        val bucket = buckets.computeIfAbsent(bucket) { Bucket() }
+        val bucket = buckets.computeIfAbsent(bucketType) { Bucket() }
         return bucket.tryAcquire(id, command.name, time)
     }
 
