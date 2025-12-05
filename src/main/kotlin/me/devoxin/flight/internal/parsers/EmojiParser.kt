@@ -1,8 +1,7 @@
 package me.devoxin.flight.internal.parsers
 
-import me.devoxin.flight.api.context.MessageContext
 import me.devoxin.flight.api.arguments.types.Emoji
-import java.util.*
+import me.devoxin.flight.api.context.MessageContext
 
 class EmojiParser : Parser<Emoji> {
     // TODO: Support unicode emoji?
