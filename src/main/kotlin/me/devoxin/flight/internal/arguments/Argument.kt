@@ -1,5 +1,9 @@
 package me.devoxin.flight.internal.arguments
 
+import java.util.concurrent.ExecutorService
+import kotlin.reflect.KFunction
+import kotlin.reflect.KParameter
+import kotlin.reflect.full.callSuspend
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -20,27 +24,23 @@ import net.dv8tion.jda.api.interactions.commands.Command.Choice
 import net.dv8tion.jda.api.interactions.commands.OptionMapping
 import net.dv8tion.jda.api.interactions.commands.OptionType
 import net.dv8tion.jda.api.interactions.commands.build.OptionData
-import java.util.concurrent.ExecutorService
-import kotlin.reflect.KFunction
-import kotlin.reflect.KParameter
-import kotlin.reflect.full.callSuspend
 
 class Argument(
-    /** The argument's parameter name */
-    val name: String,
-    /** The argument's description, as given in the [Describe] annotation */
-    val description: String,
-    val range: Range?,
-    val choices: Choices?,
-    /** The parameter type for this argument */
-    val type: Class<*>,
-    val greedy: Boolean,
-    val optional: Boolean, // Denotes that a parameter has a default value.
-    val isNullable: Boolean,
-    val isTentative: Boolean,
-    val autocompleteHandler: KFunction<*>?,
-    internal val cog: Cog,
-    val parameter: KParameter
+        /** The argument's parameter name */
+        val name: String,
+        /** The argument's description, as given in the [Describe] annotation */
+        val description: String,
+        val range: Range?,
+        val choices: Choices?,
+        /** The parameter type for this argument */
+        val type: Class<*>,
+        val greedy: Boolean,
+        val optional: Boolean, // Denotes that a parameter has a default value.
+        val isNullable: Boolean,
+        val isTentative: Boolean,
+        val autocompleteHandler: KFunction<*>?,
+        internal val cog: Cog,
+        val parameter: KParameter
 ) {
     val slashFriendlyName = name.replace(SLASH_NAME_REGEX, "_$1").lowercase()
     val autocompleteSupported = autocompleteHandler != null
@@ -53,21 +53,21 @@ class Argument(
      */
     fun asSlashCommandType(): OptionData {
         val optionType =
-            if (isEnum) OptionType.STRING
-            else
-                OPTION_TYPE_MAPPING[type]
-                    ?: throw IllegalStateException(
-                        "Unable to find OptionType for type ${type.simpleName}"
-                    )
+                if (isEnum) OptionType.STRING
+                else
+                        OPTION_TYPE_MAPPING[type]
+                                ?: throw IllegalStateException(
+                                        "Unable to find OptionType for type ${type.simpleName}"
+                                )
 
         val option =
-            OptionData(
-                optionType,
-                slashFriendlyName,
-                description,
-                !isNullable && !optional,
-                autocompleteSupported
-            )
+                OptionData(
+                        optionType,
+                        slashFriendlyName,
+                        description,
+                        !isNullable && !optional,
+                        autocompleteSupported
+                )
 
         range?.let {
             it.double.takeIf(DoubleArray::isNotEmpty)?.let { range ->
@@ -110,45 +110,42 @@ class Argument(
     @Suppress("IMPLICIT_CAST_TO_ANY", "UNCHECKED_CAST")
     fun getEntityFromOptionMapping(mapping: OptionMapping): Pair<KParameter, Any?> {
         val mappingType =
-            when (mapping.type) {
-                OptionType.STRING -> {
-                    if (isEnum) {
-                        // Resolve enum from the string value (which is the enum constant name)
-                        EnumUtils.resolveEnum(type as Class<out Enum<*>>, mapping.asString)
-                    } else {
-                        mapping.asString
+                when (mapping.type) {
+                    OptionType.STRING -> {
+                        if (isEnum) {
+                            // Resolve enum from the string value (which is the enum constant name)
+                            EnumUtils.resolveEnum(type as Class<out Enum<*>>, mapping.asString)
+                        } else {
+                            mapping.asString
+                        }
                     }
-                }
+                    OptionType.INTEGER -> mapping.asLong
+                    OptionType.BOOLEAN -> mapping.asBoolean
+                    OptionType.USER -> {
+                        when (type) {
+                            Member::class.java -> mapping.asMember
+                            User::class.java -> mapping.asUser
+                            else ->
+                                    throw IllegalStateException(
+                                            "OptionType is user but argument type is ${type.simpleName}"
+                                    )
+                        }
+                    }
+                    OptionType.CHANNEL -> mapping.asChannel
+                    OptionType.ROLE -> mapping.asRole
+                    OptionType.NUMBER ->
+                            when (type) {
+                                Float::class.java, java.lang.Float::class.java ->
+                                        mapping.asDouble.toFloat()
+                                else -> mapping.asDouble
+                            }
 
-                OptionType.INTEGER -> mapping.asLong
-                OptionType.BOOLEAN -> mapping.asBoolean
-                OptionType.USER -> {
-                    when (type) {
-                        Member::class.java -> mapping.asMember
-                        User::class.java -> mapping.asUser
-                        else ->
+                    OptionType.ATTACHMENT -> mapping.asAttachment
+                    else ->
                             throw IllegalStateException(
-                                "OptionType is user but argument type is ${type.simpleName}"
+                                    "Unsupported OptionType ${mapping.type.name}"
                             )
-                    }
                 }
-
-                OptionType.CHANNEL -> mapping.asChannel
-                OptionType.ROLE -> mapping.asRole
-                OptionType.NUMBER ->
-                    when (type) {
-                        Float::class.java, java.lang.Float::class.java ->
-                            mapping.asDouble.toFloat()
-
-                        else -> mapping.asDouble
-                    }
-
-                OptionType.ATTACHMENT -> mapping.asAttachment
-                else ->
-                    throw IllegalStateException(
-                        "Unsupported OptionType ${mapping.type.name}"
-                    )
-            }
 
         return parameter to mappingType
     }
@@ -177,15 +174,15 @@ class Argument(
     }
 
     fun executeAutocomplete(
-        event: CommandAutoCompleteInteractionEvent,
-        callback: (Throwable?) -> Unit,
-        executor: ExecutorService?
+            event: CommandAutoCompleteInteractionEvent,
+            callback: (Throwable?) -> Unit,
+            executor: ExecutorService?
     ) {
         if (autocompleteHandler == null) {
             return callback(
-                IllegalStateException(
-                    "Cannot process autocomplete event as $name does not have a registered handler!"
-                )
+                    IllegalStateException(
+                            "Cannot process autocomplete event as $name does not have a registered handler!"
+                    )
             )
         }
 
@@ -193,13 +190,13 @@ class Argument(
             DEFAULT_DISPATCHER.launch { executeAutocompleteAsync(event, callback) }
         } else {
             executor?.execute { executeAutocompleteSync(event, callback) }
-                ?: executeAutocompleteSync(event, callback)
+                    ?: executeAutocompleteSync(event, callback)
         }
     }
 
     private fun executeAutocompleteSync(
-        event: CommandAutoCompleteInteractionEvent,
-        callback: (Throwable?) -> Unit
+            event: CommandAutoCompleteInteractionEvent,
+            callback: (Throwable?) -> Unit
     ) {
         try {
             autocompleteHandler?.call(cog, event)
@@ -210,8 +207,8 @@ class Argument(
     }
 
     private suspend fun executeAutocompleteAsync(
-        event: CommandAutoCompleteInteractionEvent,
-        callback: (Throwable?) -> Unit
+            event: CommandAutoCompleteInteractionEvent,
+            callback: (Throwable?) -> Unit
     ) {
         try {
             autocompleteHandler?.callSuspend(cog, event)
@@ -227,25 +224,25 @@ class Argument(
         val SLASH_NAME_REGEX = "((?<=[a-z])[A-Z]|[A-Z](?=[a-z]))".toRegex()
 
         val OPTION_TYPE_MAPPING =
-            mapOf(
-                String::class.java to OptionType.STRING,
-                Integer::class.java to OptionType.INTEGER,
-                Integer::class.java to OptionType.INTEGER,
-                Long::class.java to OptionType.INTEGER,
-                java.lang.Long::class.java to OptionType.INTEGER,
-                Double::class.java to OptionType.NUMBER,
-                java.lang.Double::class.java to OptionType.NUMBER,
-                Float::class.java to OptionType.NUMBER,
-                java.lang.Float::class.java to OptionType.NUMBER,
-                Boolean::class.java to OptionType.BOOLEAN,
-                java.lang.Boolean::class.java to OptionType.BOOLEAN,
-                Member::class.java to OptionType.USER,
-                User::class.java to OptionType.USER,
-                GuildChannel::class.java to OptionType.CHANNEL,
-                TextChannel::class.java to OptionType.CHANNEL,
-                VoiceChannel::class.java to OptionType.CHANNEL,
-                Role::class.java to OptionType.ROLE,
-                Message.Attachment::class.java to OptionType.ATTACHMENT
-            )
+                mapOf(
+                        String::class.java to OptionType.STRING,
+                        Integer::class.java to OptionType.INTEGER,
+                        java.lang.Integer::class.java to OptionType.INTEGER,
+                        Long::class.java to OptionType.INTEGER,
+                        java.lang.Long::class.java to OptionType.INTEGER,
+                        Double::class.java to OptionType.NUMBER,
+                        java.lang.Double::class.java to OptionType.NUMBER,
+                        Float::class.java to OptionType.NUMBER,
+                        java.lang.Float::class.java to OptionType.NUMBER,
+                        Boolean::class.java to OptionType.BOOLEAN,
+                        java.lang.Boolean::class.java to OptionType.BOOLEAN,
+                        Member::class.java to OptionType.USER,
+                        User::class.java to OptionType.USER,
+                        GuildChannel::class.java to OptionType.CHANNEL,
+                        TextChannel::class.java to OptionType.CHANNEL,
+                        VoiceChannel::class.java to OptionType.CHANNEL,
+                        Role::class.java to OptionType.ROLE,
+                        Message.Attachment::class.java to OptionType.ATTACHMENT
+                )
     }
 }

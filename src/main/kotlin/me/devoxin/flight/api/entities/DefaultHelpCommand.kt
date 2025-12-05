@@ -1,7 +1,7 @@
 package me.devoxin.flight.api.entities
 
-import me.devoxin.flight.api.CommandFunction
 import me.devoxin.flight.api.annotations.Command
+import me.devoxin.flight.api.CommandFunction
 import me.devoxin.flight.api.context.MessageContext
 import me.devoxin.flight.internal.utils.TextUtils
 
@@ -53,8 +53,7 @@ open class DefaultHelpCommand(private val showParameterTypes: Boolean) : Cog {
     open fun buildCommandHelp(ctx: MessageContext, command: CommandFunction): List<String> {
         val builder = StringBuilder()
 
-        val trigger =
-            if (ctx.trigger.matches("<@!?${ctx.jda.selfUser.id}> ".toRegex())) "@${ctx.jda.selfUser.name} " else ctx.trigger
+        val trigger = if (ctx.trigger.matches("<@!?${ctx.jda.selfUser.id}> ".toRegex())) "@${ctx.jda.selfUser.name} " else ctx.trigger
         builder.append(trigger)
 
         val properties = command.properties

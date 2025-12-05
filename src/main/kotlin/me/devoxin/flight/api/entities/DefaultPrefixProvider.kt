@@ -3,8 +3,8 @@ package me.devoxin.flight.api.entities
 import net.dv8tion.jda.api.entities.Message
 
 class DefaultPrefixProvider(
-    private val prefixes: List<String>,
-    private val allowMentionPrefix: Boolean
+        private val prefixes: List<String>,
+        private val allowMentionPrefix: Boolean
 ) : PrefixProvider {
 
     override fun provide(message: Message): List<String> {

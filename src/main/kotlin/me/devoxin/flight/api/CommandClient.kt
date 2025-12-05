@@ -1,14 +1,19 @@
 package me.devoxin.flight.api
 
+import java.util.concurrent.ConcurrentHashMap
 import me.devoxin.flight.api.context.Context
 import me.devoxin.flight.api.context.ContextType
 import me.devoxin.flight.api.context.MessageContext
 import me.devoxin.flight.api.context.SlashContext
-import me.devoxin.flight.api.entities.*
-import me.devoxin.flight.api.exceptions.BadArgument
-import me.devoxin.flight.api.hooks.CommandEventAdapter
+import me.devoxin.flight.api.entities.BucketType
+import me.devoxin.flight.api.entities.CheckType
 import me.devoxin.flight.internal.arguments.ArgParser
+import me.devoxin.flight.api.exceptions.BadArgument
 import me.devoxin.flight.internal.entities.WaitingEvent
+import me.devoxin.flight.api.entities.CooldownProvider
+import me.devoxin.flight.api.hooks.CommandEventAdapter
+import me.devoxin.flight.api.entities.PrefixProvider
+import me.devoxin.flight.api.entities.CommandRegistry
 import net.dv8tion.jda.api.entities.Message
 import net.dv8tion.jda.api.entities.channel.middleman.StandardGuildMessageChannel
 import net.dv8tion.jda.api.events.Event
@@ -20,6 +25,8 @@ import net.dv8tion.jda.api.events.session.ReadyEvent
 import net.dv8tion.jda.api.hooks.EventListener
 import org.slf4j.LoggerFactory
 import java.util.concurrent.*
+import kotlin.collections.HashMap
+import kotlin.collections.HashSet
 import kotlin.reflect.KParameter
 
 class CommandClient(
@@ -70,9 +77,8 @@ class CommandClient(
         }
 
         val prefixes = prefixProvider.provide(event.message)
-        val trigger =
-            prefixes.firstOrNull(event.message.contentRaw::startsWith) // This will break for repetitive prefixes
-                ?: return
+        val trigger = prefixes.firstOrNull(event.message.contentRaw::startsWith) // This will break for repetitive prefixes
+            ?: return
 
         if (trigger.length == event.message.contentRaw.length) {
             return
@@ -306,8 +312,7 @@ class CommandClient(
             }
 
             if (props.botPermissions.isNotEmpty()) {
-                val botCheck =
-                    props.botPermissions.filterNot { ctx.guild!!.selfMember.hasPermission(ctx.guildChannel!!, it) }
+                val botCheck = props.botPermissions.filterNot { ctx.guild!!.selfMember.hasPermission(ctx.guildChannel!!, it) }
 
                 if (botCheck.isNotEmpty()) {
                     dispatchSafely { it.onBotMissingPermissions(ctx, cmd, botCheck) }
@@ -329,7 +334,7 @@ class CommandClient(
         }
 
         return eventListeners.all { it.onCommandPreInvoke(ctx, cmd) }
-                && cmd.cog.localCheck(ctx, cmd)
+            && cmd.cog.localCheck(ctx, cmd)
     }
 
     private fun isOnCooldown(cmd: CommandFunction, ctx: Context): Boolean {

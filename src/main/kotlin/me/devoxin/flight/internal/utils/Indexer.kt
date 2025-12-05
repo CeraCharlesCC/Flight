@@ -1,18 +1,19 @@
 package me.devoxin.flight.internal.utils
 
 import me.devoxin.flight.api.CommandFunction
+import me.devoxin.flight.api.context.Context
 import me.devoxin.flight.api.SubCommandFunction
 import me.devoxin.flight.api.annotations.*
-import me.devoxin.flight.api.context.Context
-import me.devoxin.flight.api.entities.Cog
-import me.devoxin.flight.api.entities.ObjectStorage
 import me.devoxin.flight.internal.arguments.Argument
 import me.devoxin.flight.internal.entities.Jar
+import me.devoxin.flight.api.entities.Cog
+import me.devoxin.flight.api.entities.ObjectStorage
 import org.reflections.Reflections
 import org.reflections.scanners.MethodParameterNamesScanner
 import org.reflections.scanners.Scanners
 import org.slf4j.LoggerFactory
 import java.io.File
+import java.lang.reflect.Constructor
 import java.lang.reflect.Modifier
 import java.net.URL
 import java.net.URLClassLoader
@@ -149,22 +150,7 @@ class Indexer {
                 throw IllegalStateException("Couldn't find autocompleteMethod with name ${autocomplete.method} for parameter ${p.name}")
             }
 
-            arguments.add(
-                Argument(
-                    name,
-                    description,
-                    range,
-                    choices,
-                    type,
-                    isGreedy,
-                    isOptional,
-                    isNullable,
-                    isTentative,
-                    autocompleteMethod,
-                    cog,
-                    p
-                )
-            )
+            arguments.add(Argument(name, description, range, choices, type, isGreedy, isOptional, isNullable, isTentative, autocompleteMethod, cog, p))
         }
 
         return arguments

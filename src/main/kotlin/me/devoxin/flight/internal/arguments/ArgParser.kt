@@ -1,5 +1,7 @@
 package me.devoxin.flight.internal.arguments
 
+import java.util.*
+import kotlin.reflect.KParameter
 import me.devoxin.flight.api.context.MessageContext
 import me.devoxin.flight.api.exceptions.BadArgument
 import me.devoxin.flight.api.exceptions.ParserNotRegistered
@@ -8,12 +10,11 @@ import me.devoxin.flight.internal.parsers.Parser
 import me.devoxin.flight.internal.utils.EnumUtils
 import me.devoxin.flight.internal.utils.TextUtils
 import me.devoxin.flight.internal.utils.Tuple
-import kotlin.reflect.KParameter
 
 class ArgParser(
-    private val ctx: MessageContext,
-    private val delimiter: Char,
-    commandArgs: List<String>
+        private val ctx: MessageContext,
+        private val delimiter: Char,
+        commandArgs: List<String>
 ) {
     private val delimiterStr = delimiter.toString()
     private var args = commandArgs.toMutableList()
@@ -37,7 +38,6 @@ class ArgParser(
                     argument.append(char)
                     escaping = false
                 }
-
                 char == '\\' -> escaping = true
                 quoting && char == '"' -> quoting = false // accept other quote chars
                 !quoting && char == '"' -> quoting = true // accept other quote chars
@@ -45,7 +45,6 @@ class ArgParser(
                     // Maybe this should throw? !test  blah -- Extraneous whitespace is ignored.
                     if (argument.isEmpty()) continue else break
                 }
-
                 else -> argument.append(char)
             }
         }
@@ -61,20 +60,19 @@ class ArgParser(
     /** @returns a Pair of the parsed argument, and the original args. */
     private fun getNextArgument(greedy: Boolean): Pair<String, List<String>> {
         val (argument, original) =
-            when {
-                args.isEmpty() -> "" to emptyList()
-                greedy -> {
-                    val args = take(args.size)
-                    args.joinToString(delimiterStr) to args
+                when {
+                    args.isEmpty() -> "" to emptyList()
+                    greedy -> {
+                        val args = take(args.size)
+                        args.joinToString(delimiterStr) to args
+                    }
+                    args[0].startsWith('"') && delimiter == ' ' ->
+                            parseQuoted() // accept other quote chars
+                    else -> {
+                        val taken = take(1)
+                        taken.joinToString(delimiterStr) to taken
+                    }
                 }
-
-                args[0].startsWith('"') && delimiter == ' ' ->
-                    parseQuoted() // accept other quote chars
-                else -> {
-                    val taken = take(1)
-                    taken.joinToString(delimiterStr) to taken
-                }
-            }
 
         var unquoted = argument.trim()
 
@@ -106,18 +104,18 @@ class ArgParser(
 
             if (result == null) {
                 val canSubstitute =
-                    arg.isTentative || arg.isNullable || (arg.optional && argument.isEmpty())
+                        arg.isTentative || arg.isNullable || (arg.optional && argument.isEmpty())
                 if (!canSubstitute) {
                     val validChoices =
-                        arg.type.enumConstants.joinToString(
-                            "`, `",
-                            prefix = "`",
-                            postfix = "`"
-                        ) { EnumUtils.getEnumDisplayName(it) }
+                            arg.type.enumConstants.joinToString(
+                                    "`, `",
+                                    prefix = "`",
+                                    postfix = "`"
+                            ) { EnumUtils.getEnumDisplayName(it) }
                     val cause =
-                        IllegalArgumentException(
-                            "Invalid choice for `${arg.name}`.\nValid choices are: $validChoices"
-                        )
+                            IllegalArgumentException(
+                                    "Invalid choice for `${arg.name}`.\nValid choices are: $validChoices"
+                            )
                     throw BadArgument(arg, argument, cause)
                 }
                 if (arg.isTentative) {
@@ -129,8 +127,8 @@ class ArgParser(
         }
 
         val parser =
-            parsers[arg.type]
-                ?: throw ParserNotRegistered("No parsers registered for `${arg.type}`")
+                parsers[arg.type]
+                        ?: throw ParserNotRegistered("No parsers registered for `${arg.type}`")
 
         val (argument, original) = getNextArgument(arg.greedy)
         val (choiceCheck, choiceResolved, choiceMessage) = checkChoices(arg, argument)
@@ -145,17 +143,17 @@ class ArgParser(
             // this mustn't try and parse if choiceMessage is not null as it indicates
             // this argument has choices, so we should try and use those choices first
             result =
-                argument.takeIf { it.isNotEmpty() }?.let {
-                    try {
-                        parser.parse(ctx, argument)
-                    } catch (e: Throwable) {
-                        throw BadArgument(arg, argument, e)
+                    argument.takeIf { it.isNotEmpty() }?.let {
+                        try {
+                            parser.parse(ctx, argument)
+                        } catch (e: Throwable) {
+                            throw BadArgument(arg, argument, e)
+                        }
                     }
-                }
         }
 
         val canSubstitute =
-            arg.isTentative || arg.isNullable || (arg.optional && argument.isEmpty())
+                arg.isTentative || arg.isNullable || (arg.optional && argument.isEmpty())
         val (rangeCheck, rangeMessage) = checkRange(arg, result)
 
         if (result == null || !rangeCheck || !choiceCheck) {
@@ -194,52 +192,44 @@ class ArgParser(
         @Suppress("KotlinConstantConditions")
         when {
             res is Number ->
-                when {
-                    long.isNotEmpty() -> {
-                        val n = res.toLong()
+                    when {
+                        long.isNotEmpty() -> {
+                            val n = res.toLong()
 
-                        return when (long.size) {
-                            1 ->
-                                (n >= long[0]) to
-                                        "`${arg.name}` must be at least ${long[0]} or bigger"
+                            return when (long.size) {
+                                1 ->
+                                        (n >= long[0]) to
+                                                "`${arg.name}` must be at least ${long[0]} or bigger"
+                                2 ->
+                                        (n >= long[0] && n <= long[1]) to
+                                                "`${arg.name}` must be within range ${long.joinToString("-")}"
+                                else -> false to "Invalid long range for `${arg.name}`"
+                            }
+                        }
+                        double.isNotEmpty() -> {
+                            val n = res.toDouble()
 
-                            2 ->
-                                (n >= long[0] && n <= long[1]) to
-                                        "`${arg.name}` must be within range ${long.joinToString("-")}"
-
-                            else -> false to "Invalid long range for `${arg.name}`"
+                            return when (double.size) {
+                                1 ->
+                                        (n >= double[0]) to
+                                                "`${arg.name}` must be at least ${double[0]} or bigger."
+                                2 ->
+                                        (n >= double[0] && n <= double[1]) to
+                                                "`${arg.name}` must be within range ${double.joinToString("-")}"
+                                else -> false to "Invalid double range for `${arg.name}`"
+                            }
                         }
                     }
-
-                    double.isNotEmpty() -> {
-                        val n = res.toDouble()
-
-                        return when (double.size) {
-                            1 ->
-                                (n >= double[0]) to
-                                        "`${arg.name}` must be at least ${double[0]} or bigger."
-
-                            2 ->
-                                (n >= double[0] && n <= double[1]) to
-                                        "`${arg.name}` must be within range ${double.joinToString("-")}"
-
-                            else -> false to "Invalid double range for `${arg.name}`"
-                        }
-                    }
-                }
-
             res is String && string.isNotEmpty() -> {
                 val n = res.length
 
                 return when (string.size) {
                     1 ->
-                        (n >= string[0]) to
-                                "`${arg.name}` must be at least ${string[0]} character${TextUtils.plural(string[0])} or longer."
-
+                            (n >= string[0]) to
+                                    "`${arg.name}` must be at least ${string[0]} character${TextUtils.plural(string[0])} or longer."
                     2 ->
-                        (n >= string[0] && n <= string[1]) to
-                                "`${arg.name}` must be within the range of ${string.joinToString("-")} characters."
-
+                            (n >= string[0] && n <= string[1]) to
+                                    "`${arg.name}` must be within the range of ${string.joinToString("-")} characters."
                     else -> false to "Invalid string range for `${arg.name}`"
                 }
             }
@@ -269,37 +259,34 @@ class ArgParser(
         val string = arg.choices.string
 
         val (resolved, error) =
-            when {
-                long.isNotEmpty() -> long.find { it.key == res }?.let { it.value to null }
-                    ?: (null to
-                            long.joinToString("`, `", prefix = "`", postfix = "`") {
-                                it.key
-                            })
-
-                double.isNotEmpty() -> double.find { it.key == res }?.let { it.value to null }
-                    ?: (null to
-                            double.joinToString(
-                                "`, `",
-                                prefix = "`",
-                                postfix = "`"
-                            ) { it.key })
-
-                string.isNotEmpty() -> string.find { it.key == res }?.let { it.value to null }
-                    ?: (null to
-                            string.joinToString(
-                                "`, `",
-                                prefix = "`",
-                                postfix = "`"
-                            ) { it.key })
-
-                else -> null to null
-            }
+                when {
+                    long.isNotEmpty() -> long.find { it.key == res }?.let { it.value to null }
+                                    ?: (null to
+                                            long.joinToString("`, `", prefix = "`", postfix = "`") {
+                                                it.key
+                                            })
+                    double.isNotEmpty() -> double.find { it.key == res }?.let { it.value to null }
+                                    ?: (null to
+                                            double.joinToString(
+                                                    "`, `",
+                                                    prefix = "`",
+                                                    postfix = "`"
+                                            ) { it.key })
+                    string.isNotEmpty() -> string.find { it.key == res }?.let { it.value to null }
+                                    ?: (null to
+                                            string.joinToString(
+                                                    "`, `",
+                                                    prefix = "`",
+                                                    postfix = "`"
+                                            ) { it.key })
+                    else -> null to null
+                }
 
         if (error != null) {
             return Tuple(
-                false,
-                null,
-                "Invalid choice for `${arg.name}`.\nValid choices are: $error"
+                    false,
+                    null,
+                    "Invalid choice for `${arg.name}`.\nValid choices are: $error"
             )
         }
 
@@ -314,27 +301,27 @@ class ArgParser(
         val parsers = hashMapOf<Class<*>, Parser<*>>()
 
         fun parseArguments(
-            cmd: Executable,
-            ctx: MessageContext,
-            args: List<String>,
-            delimiter: Char
+                cmd: Executable,
+                ctx: MessageContext,
+                args: List<String>,
+                delimiter: Char
         ): HashMap<KParameter, Any?> {
             if (cmd.arguments.isEmpty()) {
                 return hashMapOf()
             }
 
             val commandArgs =
-                if (delimiter == ' ') args
-                else args.joinToString(" ").split(delimiter).toMutableList()
+                    if (delimiter == ' ') args
+                    else args.joinToString(" ").split(delimiter).toMutableList()
             val parser = ArgParser(ctx, delimiter, commandArgs)
             val resolvedArgs = hashMapOf<KParameter, Any?>()
 
             for (arg in cmd.arguments) {
                 val res = parser.parse(arg)
                 val useValue =
-                    res != null ||
-                            (arg.isNullable && !arg.optional) ||
-                            (arg.isTentative && arg.isNullable)
+                        res != null ||
+                                (arg.isNullable && !arg.optional) ||
+                                (arg.isTentative && arg.isNullable)
 
                 if (useValue) {
                     // This will only place the argument into the map if the value is null,

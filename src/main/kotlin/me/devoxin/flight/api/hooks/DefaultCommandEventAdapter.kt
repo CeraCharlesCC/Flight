@@ -2,6 +2,7 @@ package me.devoxin.flight.api.hooks
 
 import me.devoxin.flight.api.CommandFunction
 import me.devoxin.flight.api.context.Context
+import me.devoxin.flight.api.context.MessageContext
 import me.devoxin.flight.api.entities.CheckType
 import me.devoxin.flight.api.exceptions.BadArgument
 import net.dv8tion.jda.api.Permission

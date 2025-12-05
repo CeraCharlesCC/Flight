@@ -6,14 +6,16 @@ import me.devoxin.flight.internal.entities.Executable
 import me.devoxin.flight.internal.utils.Scheduler
 import net.dv8tion.jda.api.EmbedBuilder
 import net.dv8tion.jda.api.JDA
-import net.dv8tion.jda.api.entities.Message
+import net.dv8tion.jda.api.entities.*
 import net.dv8tion.jda.api.entities.channel.concrete.PrivateChannel
 import net.dv8tion.jda.api.entities.channel.concrete.TextChannel
+import net.dv8tion.jda.api.events.Event
 import net.dv8tion.jda.api.events.message.MessageReceivedEvent
 import net.dv8tion.jda.api.requests.RestAction
 import net.dv8tion.jda.api.utils.FileUpload
 import net.dv8tion.jda.api.utils.messages.MessageCreateBuilder
 import net.dv8tion.jda.api.utils.messages.MessageCreateData
+import java.util.concurrent.CompletableFuture
 import java.util.regex.Pattern
 
 class MessageContext(
@@ -128,10 +130,7 @@ class MessageContext(
         return messageChannel.sendMessage(message).submit().await()
     }
 
-    private fun send0(
-        messageOpts: (MessageCreateBuilder.() -> Unit)? = null,
-        vararg files: FileUpload
-    ): RestAction<Message> {
+    private fun send0(messageOpts: (MessageCreateBuilder.() -> Unit)? = null, vararg files: FileUpload): RestAction<Message> {
         if (messageOpts == null && files.isEmpty()) {
             throw IllegalArgumentException("Cannot send a message with no options or attachments!")
         }
@@ -211,12 +210,10 @@ class MessageContext(
                         ?: "invalid-user"
                     content = content.replace(fullEntity, "@$entity")
                 }
-
                 "@&" -> {
                     val entity = jda.getRoleById(entityId)?.name ?: "invalid-role"
                     content = content.replace(fullEntity, "@$entity")
                 }
-
                 "#" -> {
                     val entity = jda.getTextChannelById(entityId)?.name ?: "invalid-channel"
                     content = content.replace(fullEntity, "#$entity")

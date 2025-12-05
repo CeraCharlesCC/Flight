@@ -1,18 +1,18 @@
 package me.devoxin.flight.api.entities
 
-import me.devoxin.flight.api.CommandFunction
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
+import me.devoxin.flight.api.CommandFunction
 
 class DefaultCooldownProvider : CooldownProvider {
     private val buckets = ConcurrentHashMap<BucketType, Bucket>()
 
     override fun tryAcquire(
-        id: Long,
-        bucketType: BucketType,
-        time: Long,
-        command: CommandFunction
+            id: Long,
+            bucketType: BucketType,
+            time: Long,
+            command: CommandFunction
     ): Boolean {
         val bucket = buckets.computeIfAbsent(bucketType) { Bucket() }
         return bucket.tryAcquire(id, command.name, time)
@@ -103,31 +103,31 @@ class DefaultCooldownProvider : CooldownProvider {
         }
 
         private fun scheduleCooldownCleanup(
-            id: Long,
-            commandName: String,
-            expiresAt: Long,
-            delay: Long
+                id: Long,
+                commandName: String,
+                expiresAt: Long,
+                delay: Long
         ) {
             sweeperThread.schedule(
-                {
-                    val now = System.currentTimeMillis()
+                    {
+                        val now = System.currentTimeMillis()
 
-                    cooldowns.compute(id) { _, map ->
-                        if (map == null) {
-                            return@compute null
+                        cooldowns.compute(id) { _, map ->
+                            if (map == null) {
+                                return@compute null
+                            }
+
+                            val stored = map[commandName]
+
+                            if (stored != null && stored == expiresAt && stored <= now) {
+                                map.remove(commandName)
+                            }
+
+                            map.ifEmpty { null }
                         }
-
-                        val stored = map[commandName]
-
-                        if (stored != null && stored == expiresAt && stored <= now) {
-                            map.remove(commandName)
-                        }
-
-                        map.ifEmpty { null }
-                    }
-                },
-                delay,
-                TimeUnit.MILLISECONDS
+                    },
+                    delay,
+                    TimeUnit.MILLISECONDS
             )
         }
 

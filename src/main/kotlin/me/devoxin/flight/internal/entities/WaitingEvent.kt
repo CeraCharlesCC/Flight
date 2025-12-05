@@ -5,9 +5,9 @@ import java.util.concurrent.CompletableFuture
 
 @Suppress("UNCHECKED_CAST")
 class WaitingEvent<T : GenericEvent>(
-    private val eventClass: Class<*>,
-    private val predicate: (T) -> Boolean,
-    private val future: CompletableFuture<T>
+        private val eventClass: Class<*>,
+        private val predicate: (T) -> Boolean,
+        private val future: CompletableFuture<T>
 ) {
 
     fun check(event: GenericEvent) = eventClass.isAssignableFrom(event::class.java) && predicate(event as T)
