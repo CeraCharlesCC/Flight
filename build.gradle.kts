@@ -74,6 +74,14 @@ tasks.named("sourcesJar") {
     dependsOn(writeVersion)
 }
 
+tasks.build {
+    dependsOn(writeVersion)
+}
+
+tasks.named("shadowJar") {
+    dependsOn(writeVersion)
+}
+
 publishing {
     publications {
         create<MavenPublication>("gpr") {
