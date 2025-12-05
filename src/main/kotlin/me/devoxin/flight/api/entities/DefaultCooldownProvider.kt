@@ -56,7 +56,7 @@ class DefaultCooldownProvider : CooldownProvider {
         fun getCooldownRemainingTime(id: Long, commandName: String): Long {
             val expiresAt = cooldowns[id]?.get(commandName) ?: return 0L
             val remaining = expiresAt - System.currentTimeMillis()
-            return if (remaining > 0L) remaining else 0L
+            return remaining.coerceAtLeast(0L)
         }
 
         fun setCooldown(id: Long, time: Long, commandName: String) {
