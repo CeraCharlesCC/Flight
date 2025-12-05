@@ -9,6 +9,16 @@ import kotlin.math.abs
 class DefaultCooldownProvider : CooldownProvider {
     private val buckets = ConcurrentHashMap<BucketType, Bucket>()
 
+    override fun tryAcquire(
+        id: Long,
+        bucket: BucketType,
+        time: Long,
+        command: CommandFunction
+    ): Boolean {
+        val bucket = buckets.computeIfAbsent(bucket) { Bucket() }
+        return bucket.tryAcquire(id, command.name, time)
+    }
+
     override fun isOnCooldown(id: Long, bucket: BucketType, command: CommandFunction): Boolean {
         return buckets[bucket]?.isOnCooldown(id, command.name) ?: false
     }
@@ -38,7 +48,6 @@ class DefaultCooldownProvider : CooldownProvider {
         buckets.values.forEach { it.empty() }
     }
 
-
     override fun shutdown() {
         buckets.values.forEach { it.shutdown() }
         buckets.clear()
@@ -46,8 +55,48 @@ class DefaultCooldownProvider : CooldownProvider {
 
     class Bucket {
         private val sweeperThread = Executors.newSingleThreadScheduledExecutor()
-
         private val cooldowns = ConcurrentHashMap<Long, MutableMap<String, Long>>()
+
+        fun tryAcquire(id: Long, commandName: String, time: Long): Boolean {
+            val now = System.currentTimeMillis()
+            val expiresAt = now + time
+
+            var acquired = false
+
+            cooldowns.compute(id) { _, existing ->
+                val map = (existing ?: ConcurrentHashMap<String, Long>())
+
+                val current = map[commandName]
+                if (current == null || current <= now) {
+                    map[commandName] = expiresAt
+                    acquired = true
+                }
+
+                map.ifEmpty { null }
+            }
+
+            if (acquired) {
+                sweeperThread.schedule({
+                    val currentTime = System.currentTimeMillis()
+
+                    cooldowns.compute(id) { _, map ->
+                        if (map == null) {
+                            return@compute null
+                        }
+
+                        val stored = map[commandName]
+
+                        if (stored != null && stored == expiresAt && stored <= currentTime) {
+                            map.remove(commandName)
+                        }
+
+                        map.ifEmpty { null }
+                    }
+                }, time, TimeUnit.MILLISECONDS)
+            }
+
+            return acquired
+        }
 
         fun isOnCooldown(id: Long, commandName: String): Boolean {
             return getCooldownRemainingTime(id, commandName) > 0L
@@ -60,42 +109,45 @@ class DefaultCooldownProvider : CooldownProvider {
         }
 
         fun setCooldown(id: Long, time: Long, commandName: String) {
-            val entityCooldowns = cooldowns.computeIfAbsent(id) { ConcurrentHashMap() }
             val expiresAt = System.currentTimeMillis() + time
 
-            entityCooldowns[commandName] = expiresAt
+            cooldowns.compute(id) { _, existing ->
+                val entityCooldowns = (existing ?: ConcurrentHashMap())
+                entityCooldowns[commandName] = expiresAt
+                entityCooldowns
+            }
 
             sweeperThread.schedule({
-                cooldowns[id]?.let { map ->
-                    map.computeIfPresent(commandName) { _, stored ->
-                        if (stored == expiresAt && stored <= System.currentTimeMillis()) {
-                            null
-                        } else {
-                            stored
-                        }
+                val now = System.currentTimeMillis()
+
+                cooldowns.compute(id) { _, map ->
+                    if (map == null) {
+                        return@compute null
                     }
 
-                    if (map.isEmpty()) {
-                        cooldowns.remove(id, map)
+                    val stored = map[commandName]
+
+                    if (stored != null && stored == expiresAt && stored <= now) {
+                        map.remove(commandName)
                     }
+
+                    map.ifEmpty { null }
                 }
             }, time, TimeUnit.MILLISECONDS)
         }
 
         fun removeCooldown(id: Long, commandName: String) {
-            cooldowns[id]?.let { map ->
+            cooldowns.computeIfPresent(id) { _, map ->
                 map.remove(commandName)
-                if (map.isEmpty()) {
-                    cooldowns.remove(id, map)
-                }
+                map.ifEmpty { null }
             }
         }
 
         fun clearCooldown(commandName: String) {
-            cooldowns.entries.forEach { (id, map) ->
-                map.remove(commandName)
-                if (map.isEmpty()) {
-                    cooldowns.remove(id, map)
+            cooldowns.keys.forEach { id ->
+                cooldowns.computeIfPresent(id) { _, map ->
+                    map.remove(commandName)
+                    map.ifEmpty { null }
                 }
             }
         }
