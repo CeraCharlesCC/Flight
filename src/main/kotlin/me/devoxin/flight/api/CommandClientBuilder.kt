@@ -8,8 +8,6 @@ import me.devoxin.flight.api.hooks.CommandEventAdapter
 import me.devoxin.flight.api.hooks.DefaultCommandEventAdapter
 import me.devoxin.flight.internal.arguments.ArgParser
 import me.devoxin.flight.internal.parsers.*
-import me.devoxin.flight.internal.parsers.TextChannelParser
-import me.devoxin.flight.internal.parsers.VoiceChannelParser
 import net.dv8tion.jda.api.entities.Member
 import net.dv8tion.jda.api.entities.Role
 import net.dv8tion.jda.api.entities.User
@@ -168,7 +166,7 @@ class CommandClientBuilder {
 
         val intParser = IntParser()
         ArgParser.parsers[Int::class.java] = intParser
-        ArgParser.parsers[java.lang.Integer::class.java] = intParser
+        ArgParser.parsers[Integer::class.java] = intParser
 
         val longParser = LongParser()
         ArgParser.parsers[Long::class.java] = longParser
@@ -219,8 +217,10 @@ class CommandClientBuilder {
 
         val prefixProvider = this.prefixProvider ?: DefaultPrefixProvider(prefixes, allowMentionPrefix)
         val cooldownProvider = this.cooldownProvider ?: DefaultCooldownProvider()
-        val commandClient = CommandClient(prefixProvider, cooldownProvider, ignoreBots, eventListeners.toList(),
-            commandExecutor, ownerIds)
+        val commandClient = CommandClient(
+            prefixProvider, cooldownProvider, ignoreBots, eventListeners.toList(),
+            commandExecutor, ownerIds
+        )
 
         if (helpCommandConfig.enabled) {
             commandClient.commands.register(DefaultHelpCommand(helpCommandConfig.showParameterTypes))

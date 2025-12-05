@@ -164,7 +164,9 @@ class SlashContext(
     internal fun respond0(message: MessageCreateData, ephemeral: Boolean = false): CompletableFuture<*> {
         return when {
             replied -> event.hook.sendMessage(message).setEphemeral(ephemeral).submit()
-            deferred -> event.hook.editOriginal(MessageEditData.fromCreateData(message)).submit().thenApply { replied = true; it }
+            deferred -> event.hook.editOriginal(MessageEditData.fromCreateData(message)).submit()
+                .thenApply { replied = true; it }
+
             else -> event.reply(message).setEphemeral(ephemeral).submit().thenApply { replied = true; it }
         }
     }
