@@ -234,7 +234,7 @@ class CommandClient(
         if (matched.isEmpty()) {
             return
         }
-        
+
         val jdaEvent = event as Event
         matched.forEach { it.accept(jdaEvent) }
     }
