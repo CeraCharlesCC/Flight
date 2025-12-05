@@ -124,9 +124,11 @@ interface CooldownProvider {
      *
      * @param time
      *       How long the cool-down should last for, in milliseconds.
+     *
      * @param command
      *       The command that was invoked.
      *
+     * @return true if the cooldown was successfully acquired (not already active), false otherwise.
      */
     fun tryAcquire(id: Long, bucketType: BucketType, time: Long, command: CommandFunction): Boolean
 }
