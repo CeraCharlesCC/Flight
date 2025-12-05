@@ -1,19 +1,18 @@
 package me.devoxin.flight.api.entities
 
-import me.devoxin.flight.api.CommandFunction
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
-import kotlin.math.abs
+import me.devoxin.flight.api.CommandFunction
 
 class DefaultCooldownProvider : CooldownProvider {
     private val buckets = ConcurrentHashMap<BucketType, Bucket>()
 
     override fun tryAcquire(
-        id: Long,
-        bucketType: BucketType,
-        time: Long,
-        command: CommandFunction
+            id: Long,
+            bucketType: BucketType,
+            time: Long,
+            command: CommandFunction
     ): Boolean {
         val bucket = buckets.computeIfAbsent(bucketType) { Bucket() }
         return bucket.tryAcquire(id, command.name, time)
@@ -28,8 +27,7 @@ class DefaultCooldownProvider : CooldownProvider {
     }
 
     override fun setCooldown(id: Long, bucket: BucketType, time: Long, command: CommandFunction) {
-        buckets.computeIfAbsent(bucket) { Bucket() }
-            .setCooldown(id, time, command.name)
+        buckets.computeIfAbsent(bucket) { Bucket() }.setCooldown(id, time, command.name)
     }
 
     override fun removeCooldown(id: Long, bucket: BucketType, command: CommandFunction) {
@@ -76,23 +74,7 @@ class DefaultCooldownProvider : CooldownProvider {
             }
 
             if (acquired) {
-                sweeperThread.schedule({
-                    val currentTime = System.currentTimeMillis()
-
-                    cooldowns.compute(id) { _, map ->
-                        if (map == null) {
-                            return@compute null
-                        }
-
-                        val stored = map[commandName]
-
-                        if (stored != null && stored == expiresAt && stored <= currentTime) {
-                            map.remove(commandName)
-                        }
-
-                        map.ifEmpty { null }
-                    }
-                }, time, TimeUnit.MILLISECONDS)
+                scheduleCooldownCleanup(id, commandName, expiresAt, time)
             }
 
             return acquired
@@ -117,23 +99,36 @@ class DefaultCooldownProvider : CooldownProvider {
                 entityCooldowns
             }
 
-            sweeperThread.schedule({
-                val now = System.currentTimeMillis()
+            scheduleCooldownCleanup(id, commandName, expiresAt, time)
+        }
 
-                cooldowns.compute(id) { _, map ->
-                    if (map == null) {
-                        return@compute null
-                    }
+        private fun scheduleCooldownCleanup(
+                id: Long,
+                commandName: String,
+                expiresAt: Long,
+                delay: Long
+        ) {
+            sweeperThread.schedule(
+                    {
+                        val now = System.currentTimeMillis()
 
-                    val stored = map[commandName]
+                        cooldowns.compute(id) { _, map ->
+                            if (map == null) {
+                                return@compute null
+                            }
 
-                    if (stored != null && stored == expiresAt && stored <= now) {
-                        map.remove(commandName)
-                    }
+                            val stored = map[commandName]
 
-                    map.ifEmpty { null }
-                }
-            }, time, TimeUnit.MILLISECONDS)
+                            if (stored != null && stored == expiresAt && stored <= now) {
+                                map.remove(commandName)
+                            }
+
+                            map.ifEmpty { null }
+                        }
+                    },
+                    delay,
+                    TimeUnit.MILLISECONDS
+            )
         }
 
         fun removeCooldown(id: Long, commandName: String) {
