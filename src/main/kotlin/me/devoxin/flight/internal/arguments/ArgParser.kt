@@ -1,19 +1,20 @@
 package me.devoxin.flight.internal.arguments
 
+import java.util.*
+import kotlin.reflect.KParameter
 import me.devoxin.flight.api.context.MessageContext
 import me.devoxin.flight.api.exceptions.BadArgument
 import me.devoxin.flight.api.exceptions.ParserNotRegistered
 import me.devoxin.flight.internal.entities.Executable
 import me.devoxin.flight.internal.parsers.Parser
+import me.devoxin.flight.internal.utils.EnumUtils
 import me.devoxin.flight.internal.utils.TextUtils
 import me.devoxin.flight.internal.utils.Tuple
-import java.util.*
-import kotlin.reflect.KParameter
 
 class ArgParser(
-    private val ctx: MessageContext,
-    private val delimiter: Char,
-    commandArgs: List<String>
+        private val ctx: MessageContext,
+        private val delimiter: Char,
+        commandArgs: List<String>
 ) {
     private val delimiterStr = delimiter.toString()
     private var args = commandArgs.toMutableList()
@@ -42,8 +43,7 @@ class ArgParser(
                 !quoting && char == '"' -> quoting = true // accept other quote chars
                 !quoting && char == delimiter -> {
                     // Maybe this should throw? !test  blah -- Extraneous whitespace is ignored.
-                    if (argument.isEmpty()) continue
-                    else break
+                    if (argument.isEmpty()) continue else break
                 }
                 else -> argument.append(char)
             }
@@ -51,30 +51,28 @@ class ArgParser(
 
         argument.append('"')
 
-        val remainingArgs = StringBuilder().apply {
-            iterator.forEachRemaining(this::append)
-        }
+        val remainingArgs = StringBuilder().apply { iterator.forEachRemaining(this::append) }
 
         args = remainingArgs.toString().split(delimiter).toMutableList()
         return argument.toString() to original.split(delimiterStr)
     }
 
-    /**
-     * @returns a Pair of the parsed argument, and the original args.
-     */
+    /** @returns a Pair of the parsed argument, and the original args. */
     private fun getNextArgument(greedy: Boolean): Pair<String, List<String>> {
-        val (argument, original) = when {
-            args.isEmpty() -> "" to emptyList()
-            greedy -> {
-                val args = take(args.size)
-                args.joinToString(delimiterStr) to args
-            }
-            args[0].startsWith('"') && delimiter == ' ' -> parseQuoted() // accept other quote chars
-            else -> {
-                val taken = take(1)
-                taken.joinToString(delimiterStr) to taken
-            }
-        }
+        val (argument, original) =
+                when {
+                    args.isEmpty() -> "" to emptyList()
+                    greedy -> {
+                        val args = take(args.size)
+                        args.joinToString(delimiterStr) to args
+                    }
+                    args[0].startsWith('"') && delimiter == ' ' ->
+                            parseQuoted() // accept other quote chars
+                    else -> {
+                        val taken = take(1)
+                        taken.joinToString(delimiterStr) to taken
+                    }
+                }
 
         var unquoted = argument.trim()
 
@@ -85,9 +83,52 @@ class ArgParser(
         return unquoted to original
     }
 
+    @Suppress("UNCHECKED_CAST")
     fun parse(arg: Argument): Any? {
-        val parser = parsers[arg.type]
-            ?: throw ParserNotRegistered("No parsers registered for `${arg.type}`")
+        // For enum types, resolve directly without needing a registered parser
+        if (arg.isEnum) {
+            val (argument, original) = getNextArgument(arg.greedy)
+
+            if (argument.isEmpty()) {
+                val canSubstitute = arg.isTentative || arg.isNullable || arg.optional
+                if (!canSubstitute) {
+                    throw BadArgument(arg, argument, null)
+                }
+                if (arg.isTentative) {
+                    restore(original)
+                }
+                return null
+            }
+
+            val result = EnumUtils.resolveEnum(arg.type as Class<out Enum<*>>, argument)
+
+            if (result == null) {
+                val canSubstitute =
+                        arg.isTentative || arg.isNullable || (arg.optional && argument.isEmpty())
+                if (!canSubstitute) {
+                    val validChoices =
+                            arg.type.enumConstants.joinToString(
+                                    "`, `",
+                                    prefix = "`",
+                                    postfix = "`"
+                            ) { EnumUtils.getEnumDisplayName(it) }
+                    val cause =
+                            IllegalArgumentException(
+                                    "Invalid choice for `${arg.name}`.\nValid choices are: $validChoices"
+                            )
+                    throw BadArgument(arg, argument, cause)
+                }
+                if (arg.isTentative) {
+                    restore(original)
+                }
+            }
+
+            return result
+        }
+
+        val parser =
+                parsers[arg.type]
+                        ?: throw ParserNotRegistered("No parsers registered for `${arg.type}`")
 
         val (argument, original) = getNextArgument(arg.greedy)
         val (choiceCheck, choiceResolved, choiceMessage) = checkChoices(arg, argument)
@@ -101,27 +142,31 @@ class ArgParser(
             // otherwise try and parse into the required type
             // this mustn't try and parse if choiceMessage is not null as it indicates
             // this argument has choices, so we should try and use those choices first
-            result = argument.takeIf { it.isNotEmpty() }?.let {
-                try {
-                    parser.parse(ctx, argument)
-                } catch (e: Throwable) {
-                    throw BadArgument(arg, argument, e)
-                }
-            }
+            result =
+                    argument.takeIf { it.isNotEmpty() }?.let {
+                        try {
+                            parser.parse(ctx, argument)
+                        } catch (e: Throwable) {
+                            throw BadArgument(arg, argument, e)
+                        }
+                    }
         }
 
-        val canSubstitute = arg.isTentative || arg.isNullable || (arg.optional && argument.isEmpty())
+        val canSubstitute =
+                arg.isTentative || arg.isNullable || (arg.optional && argument.isEmpty())
         val (rangeCheck, rangeMessage) = checkRange(arg, result)
 
         if (result == null || !rangeCheck || !choiceCheck) {
             if (!canSubstitute) { // canSubstitute -> Whether we can pass null or the default value.
                 val cause = (rangeMessage ?: choiceMessage)?.let(::IllegalArgumentException)
-                // This should throw if the result is not present, and one of the following is not true:
+                // This should throw if the result is not present, and one of the following is not
+                // true:
                 // - The arg is marked tentative (isTentative)
                 // - The arg can use null (isNullable)
-                // - The arg has a default (isOptional) and no value was specified for it (argument.isEmpty())
+                // - The arg has a default (isOptional) and no value was specified for it
+                // (argument.isEmpty())
 
-                //!arg.isNullable && (!arg.optional || argument.isNotEmpty())) {
+                // !arg.isNullable && (!arg.optional || argument.isNotEmpty())) {
                 throw BadArgument(arg, argument, cause)
             }
 
@@ -146,32 +191,45 @@ class ArgParser(
 
         @Suppress("KotlinConstantConditions")
         when {
-            res is Number -> when {
-                long.isNotEmpty() -> {
-                    val n = res.toLong()
+            res is Number ->
+                    when {
+                        long.isNotEmpty() -> {
+                            val n = res.toLong()
 
-                    return when (long.size) {
-                        1 -> (n >= long[0]) to "`${arg.name}` must be at least ${long[0]} or bigger"
-                        2 -> (n >= long[0] && n <= long[1]) to "`${arg.name}` must be within range ${long.joinToString("-")}"
-                        else -> false to "Invalid long range for `${arg.name}`"
-                    }
-                }
-                double.isNotEmpty() -> {
-                    val n = res.toDouble()
+                            return when (long.size) {
+                                1 ->
+                                        (n >= long[0]) to
+                                                "`${arg.name}` must be at least ${long[0]} or bigger"
+                                2 ->
+                                        (n >= long[0] && n <= long[1]) to
+                                                "`${arg.name}` must be within range ${long.joinToString("-")}"
+                                else -> false to "Invalid long range for `${arg.name}`"
+                            }
+                        }
+                        double.isNotEmpty() -> {
+                            val n = res.toDouble()
 
-                    return when (double.size) {
-                        1 -> (n >= double[0]) to "`${arg.name}` must be at least ${double[0]} or bigger."
-                        2 -> (n >= double[0] && n <= double[1]) to "`${arg.name}` must be within range ${double.joinToString("-")}"
-                        else -> false to "Invalid double range for `${arg.name}`"
+                            return when (double.size) {
+                                1 ->
+                                        (n >= double[0]) to
+                                                "`${arg.name}` must be at least ${double[0]} or bigger."
+                                2 ->
+                                        (n >= double[0] && n <= double[1]) to
+                                                "`${arg.name}` must be within range ${double.joinToString("-")}"
+                                else -> false to "Invalid double range for `${arg.name}`"
+                            }
+                        }
                     }
-                }
-            }
             res is String && string.isNotEmpty() -> {
                 val n = res.length
 
                 return when (string.size) {
-                    1 -> (n >= string[0]) to "`${arg.name}` must be at least ${string[0]} character${TextUtils.plural(string[0])} or longer."
-                    2 -> (n >= string[0] && n <= string[1]) to "`${arg.name}` must be within the range of ${string.joinToString("-")} characters."
+                    1 ->
+                            (n >= string[0]) to
+                                    "`${arg.name}` must be at least ${string[0]} character${TextUtils.plural(string[0])} or longer."
+                    2 ->
+                            (n >= string[0] && n <= string[1]) to
+                                    "`${arg.name}` must be within the range of ${string.joinToString("-")} characters."
                     else -> false to "Invalid string range for `${arg.name}`"
                 }
             }
@@ -183,11 +241,11 @@ class ArgParser(
     /**
      * Checks whether provided [res] is a valid choice.
      *
-     * This will return any of the following:
-     * [true, null, null] - if there are no choices for this argument.
-     * [true, Any, null] - if the choice was resolved. Any will be the choice value.
-     * [false, null, null] - if there are choices, but [res] is not an applicable type.
-     * [false, null, String] - if there are choices, but [res] matched none of them. String will be an error message.
+     * This will return any of the following: [true, null, null] - if there are no choices for this
+     * argument. [true, Any, null] - if the choice was resolved. Any will be the choice value.
+     * [false, null, null] - if there are choices, but [res] is not an applicable type. [false,
+     * null, String] - if there are choices, but [res] matched none of them. String will be an error
+     * message.
      */
     private fun checkChoices(arg: Argument, res: String?): Tuple<Boolean, Any?, String?> {
         arg.choices ?: return Tuple(true, null, null)
@@ -200,18 +258,36 @@ class ArgParser(
         val long = arg.choices.long
         val string = arg.choices.string
 
-        val (resolved, error) = when {
-            long.isNotEmpty() -> long.find { it.key == res }?.let { it.value to null }
-                ?: (null to long.joinToString("`, `", prefix = "`", postfix = "`") { it.key })
-            double.isNotEmpty() -> double.find { it.key == res }?.let { it.value to null }
-                ?: (null to double.joinToString("`, `", prefix = "`", postfix = "`") { it.key })
-            string.isNotEmpty() -> string.find { it.key == res }?.let { it.value to null }
-                ?: (null to string.joinToString("`, `", prefix = "`", postfix = "`") { it.key })
-            else -> null to null
-        }
+        val (resolved, error) =
+                when {
+                    long.isNotEmpty() -> long.find { it.key == res }?.let { it.value to null }
+                                    ?: (null to
+                                            long.joinToString("`, `", prefix = "`", postfix = "`") {
+                                                it.key
+                                            })
+                    double.isNotEmpty() -> double.find { it.key == res }?.let { it.value to null }
+                                    ?: (null to
+                                            double.joinToString(
+                                                    "`, `",
+                                                    prefix = "`",
+                                                    postfix = "`"
+                                            ) { it.key })
+                    string.isNotEmpty() -> string.find { it.key == res }?.let { it.value to null }
+                                    ?: (null to
+                                            string.joinToString(
+                                                    "`, `",
+                                                    prefix = "`",
+                                                    postfix = "`"
+                                            ) { it.key })
+                    else -> null to null
+                }
 
         if (error != null) {
-            return Tuple(false, null, "Invalid choice for `${arg.name}`.\nValid choices are: $error")
+            return Tuple(
+                    false,
+                    null,
+                    "Invalid choice for `${arg.name}`.\nValid choices are: $error"
+            )
         }
 
         if (resolved != null) {
@@ -224,23 +300,34 @@ class ArgParser(
     companion object {
         val parsers = hashMapOf<Class<*>, Parser<*>>()
 
-        fun parseArguments(cmd: Executable, ctx: MessageContext, args: List<String>, delimiter: Char): HashMap<KParameter, Any?> {
+        fun parseArguments(
+                cmd: Executable,
+                ctx: MessageContext,
+                args: List<String>,
+                delimiter: Char
+        ): HashMap<KParameter, Any?> {
             if (cmd.arguments.isEmpty()) {
                 return hashMapOf()
             }
 
-            val commandArgs = if (delimiter == ' ') args else args.joinToString(" ").split(delimiter).toMutableList()
+            val commandArgs =
+                    if (delimiter == ' ') args
+                    else args.joinToString(" ").split(delimiter).toMutableList()
             val parser = ArgParser(ctx, delimiter, commandArgs)
             val resolvedArgs = hashMapOf<KParameter, Any?>()
 
             for (arg in cmd.arguments) {
                 val res = parser.parse(arg)
-                val useValue = res != null || (arg.isNullable && !arg.optional) || (arg.isTentative && arg.isNullable)
+                val useValue =
+                        res != null ||
+                                (arg.isNullable && !arg.optional) ||
+                                (arg.isTentative && arg.isNullable)
 
                 if (useValue) {
-                    //This will only place the argument into the map if the value is null,
+                    // This will only place the argument into the map if the value is null,
                     // or if the parameter requires a value (i.e. marked nullable).
-                    //Commands marked optional already have a parameter, so they don't need user-provided values
+                    // Commands marked optional already have a parameter, so they don't need
+                    // user-provided values
                     // unless the argument was successfully resolved for that parameter.
                     resolvedArgs[arg.parameter] = res
                 }
