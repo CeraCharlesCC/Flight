@@ -61,6 +61,7 @@ class CommandClient(
      */
     fun shutdown() {
         waiterScheduler.shutdown()
+        cooldownProvider.shutdown()
     }
 
     private fun onMessageReceived(event: MessageReceivedEvent) {
