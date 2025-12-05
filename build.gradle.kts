@@ -56,6 +56,7 @@ val writeVersion by tasks.registering {
     val outputFile = file("$outputDir/flight.txt")
 
     outputs.file(outputFile)
+    outputs.upToDateWhen { false }
 
     doLast {
         if (!outputDir.exists()) {
@@ -92,16 +93,4 @@ publishing {
             }
         }
     }
-}
-
-val mavenPublishTask by tasks.registering {
-    dependsOn("publishToMavenLocal")
-}
-
-tasks.build {
-    dependsOn(writeVersion)
-}
-
-tasks.named("shadowJar") {
-    dependsOn(writeVersion)
 }
