@@ -1,6 +1,6 @@
 package me.devoxin.flight.api
 
-import me.devoxin.flight.api.annotations.GuildIds
+import java.util.concurrent.ConcurrentHashMap
 import me.devoxin.flight.api.context.Context
 import me.devoxin.flight.api.context.ContextType
 import me.devoxin.flight.api.context.MessageContext
@@ -38,7 +38,7 @@ class CommandClient(
     val ownerIds: MutableSet<Long>
 ) : EventListener {
     private val waiterScheduler = Executors.newSingleThreadScheduledExecutor()
-    private val pendingEvents = hashMapOf<Class<*>, HashSet<WaitingEvent<*>>>()
+    private val pendingEvents = ConcurrentHashMap<Class<*>, MutableSet<WaitingEvent<*>>>()
     val commands = CommandRegistry()
 
     /**
@@ -61,6 +61,13 @@ class CommandClient(
         val command = args.removeAt(0).lowercase()
 
         return (commands[command] ?: commands.findCommandByAlias(command)) != null
+    }
+
+    /**
+     * Shuts down the internal waiter scheduler.
+     */
+    fun shutdown() {
+        waiterScheduler.shutdown()
     }
 
     private fun onMessageReceived(event: MessageReceivedEvent) {
@@ -209,21 +216,40 @@ class CommandClient(
 
     private fun onGenericEvent(event: GenericEvent) {
         val events = pendingEvents[event::class.java] ?: return
+
         val passed = events.filter { it.check(event) }
 
-        events.removeAll(passed)
+        if (passed.isEmpty()) {
+            return
+        }
+
+        events.removeAll(passed.toSet())
         passed.forEach { it.accept(event) }
+
+        if (events.isEmpty()) {
+            pendingEvents.remove(event::class.java, events)
+        }
     }
 
-    inline fun <reified T: Event> waitFor(noinline predicate: (T) -> Boolean, timeout: Long): CompletableFuture<T> {
+    inline fun <reified T : Event> waitFor(
+        noinline predicate: (T) -> Boolean,
+        timeout: Long
+    ): CompletableFuture<T> {
         return waitFor(T::class.java, predicate, timeout)
     }
 
-    fun <T: Event> waitFor(event: Class<T>, predicate: (T) -> Boolean, timeout: Long): CompletableFuture<T> {
+    fun <T : Event> waitFor(
+        event: Class<T>,
+        predicate: (T) -> Boolean,
+        timeout: Long
+    ): CompletableFuture<T> {
         val future = CompletableFuture<T>()
         val we = WaitingEvent(event, predicate, future)
 
-        val set = pendingEvents.computeIfAbsent(event) { hashSetOf() }
+        // concurrent set per event type
+        val set = pendingEvents.computeIfAbsent(event) {
+            ConcurrentHashMap.newKeySet<WaitingEvent<*>>()
+        }
         set.add(we)
 
         if (timeout > 0) {

@@ -193,8 +193,9 @@ class MessageContext(
      * @returns The sanitized string.
      */
     fun cleanContent(str: String): String {
-        var content = str.replace("e", "е")
-        // We use a Cyrillic "e" instead of \u200b as it keeps character count the same.
+        var content = str
+            .replace("@everyone", "@еveryone") // first 'e' is a Cyrillic 'е'
+            .replace("@here", "@hеre") // first 'e' is a Cyrillic 'е'
         val matcher = mentionPattern.matcher(str)
 
         while (matcher.find()) {

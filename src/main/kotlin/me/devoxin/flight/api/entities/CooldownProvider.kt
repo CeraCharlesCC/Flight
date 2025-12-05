@@ -103,4 +103,9 @@ interface CooldownProvider {
      * Clears all cool-downs stored in this provider.
      */
     fun clearCooldowns()
+
+    /**
+     * Shutdown the cool-down provider, performing any necessary cleanup.
+     */
+    fun shutdown()
 }

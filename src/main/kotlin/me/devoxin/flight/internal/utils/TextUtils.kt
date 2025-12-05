@@ -1,49 +1,62 @@
 package me.devoxin.flight.internal.utils
 
+
 object TextUtils {
     fun split(content: String, limit: Int = 2000): List<String> {
         if (content.isEmpty()) {
             return emptyList()
-        } else if (content.length < limit) {
+        }
+        if (content.length <= limit) {
             return listOf(content)
         }
 
         val pages = mutableListOf<String>()
-
-        val lines = content.trim().split("\n").dropLastWhile { it.isEmpty() }
         val chunk = StringBuilder(limit)
 
-        for (line in lines) {
-            if (chunk.isNotEmpty() && chunk.length + line.length > limit) {
-                pages.add(chunk.toString())
+        fun flushChunk() {
+            if (chunk.isNotEmpty()) {
+                pages += chunk.toString()
                 chunk.setLength(0)
             }
+        }
 
-            if (line.length > limit) {
-                val lineChunks = line.length / limit
+        val lines = content.split('\n')
 
-                for (i in 0 until lineChunks) {
-                    val start = limit * i
-                    val end = start + limit
-                    pages.add(line.substring(start, end))
+        lines.forEachIndexed { index, rawLine ->
+            val line = if (index == lines.lastIndex) rawLine else rawLine + "\n"
+            var cursor = 0
+
+            while (cursor < line.length) {
+                val remainingInLine = line.length - cursor
+                val remainingSpace = limit - chunk.length
+
+                if (remainingSpace == 0) {
+                    flushChunk()
+                    continue
                 }
-            } else {
-                chunk.append(line).append("\n")
+
+                val toTake = minOf(remainingInLine, remainingSpace)
+                chunk.append(line, cursor, cursor + toTake)
+                cursor += toTake
+
+                if (chunk.length == limit) {
+                    flushChunk()
+                }
             }
         }
 
-        if (chunk.isNotEmpty()) {
-            pages.add(chunk.toString())
-        }
-
-        return pages.toList()
+        flushChunk()
+        return pages
     }
 
-    fun capitalise(s: String): String = s.lowercase().replaceFirstChar { it.uppercase() }
+    fun capitalise(s: String): String =
+        s.lowercase().replaceFirstChar { it.uppercase() }
 
     fun plural(num: Number): String = if (num == 1) "" else "s"
 
-    fun truncate(s: String, maxLength: Int) = s.takeIf { it.length <= maxLength } ?: (s.take(maxLength - 3) + "...")
+    fun truncate(s: String, maxLength: Int) =
+        s.takeIf { it.length <= maxLength } ?: (s.take(maxLength - 3) + "...")
 
-    fun toTitleCase(s: String) = s.split(" +".toRegex()).joinToString(" ", transform = ::capitalise)
+    fun toTitleCase(s: String) =
+        s.split(" +".toRegex()).joinToString(" ", transform = ::capitalise)
 }

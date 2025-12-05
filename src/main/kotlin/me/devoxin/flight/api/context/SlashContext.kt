@@ -153,9 +153,9 @@ class SlashContext(
     }
 
     internal fun defer0(ephemeral: Boolean): CompletableFuture<InteractionHook> {
-        if (!deferred) { // Idempotency handling
+        if (!deferred) {
+            deferred = true
             return event.deferReply(ephemeral).submit()
-                .thenApply { deferred = true; it }
         }
 
         return CompletableFuture.completedFuture(event.hook)
