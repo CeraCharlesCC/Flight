@@ -109,7 +109,7 @@ class DefaultCooldownProvider : CooldownProvider {
         }
 
         fun shutdown() {
-            sweeperThread.shutdown()
+            sweeperThread.shutdownNow()
             cooldowns.clear()
         }
     }
