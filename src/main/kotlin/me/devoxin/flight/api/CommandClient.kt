@@ -215,19 +215,21 @@ class CommandClient(
     }
 
     private fun onGenericEvent(event: GenericEvent) {
-        val events = pendingEvents[event::class.java] ?: return
+        val key = event::class.java
 
-        val passed = events.filter { it.check(event) }
+        pendingEvents.compute(key) { _, set ->
+            val events = set ?: return@compute null
 
-        if (passed.isEmpty()) {
-            return
-        }
+            val passed = events.filter { it.check(event) }
+            if (passed.isEmpty()) {
+                return@compute events
+            }
 
-        events.removeAll(passed.toSet())
-        passed.forEach { it.accept(event) }
+            events.removeAll(passed.toSet())
+            @Suppress("UNCHECKED_CAST")
+            passed.forEach { it.accept(event as Event) }
 
-        if (events.isEmpty()) {
-            pendingEvents.remove(event::class.java, events)
+            if (events.isEmpty()) null else events
         }
     }
 
@@ -246,7 +248,6 @@ class CommandClient(
         val future = CompletableFuture<T>()
         val we = WaitingEvent(event, predicate, future)
 
-        // concurrent set per event type
         val set = pendingEvents.computeIfAbsent(event) {
             ConcurrentHashMap.newKeySet<WaitingEvent<*>>()
         }
@@ -256,7 +257,10 @@ class CommandClient(
             waiterScheduler.schedule({
                 if (!future.isDone) {
                     future.completeExceptionally(TimeoutException())
-                    set.remove(we)
+
+                    pendingEvents.compute(event) { _, existing ->
+                        existing?.apply { remove(we) }?.takeIf { it.isNotEmpty() }
+                    }
                 }
             }, timeout, TimeUnit.MILLISECONDS)
         }
