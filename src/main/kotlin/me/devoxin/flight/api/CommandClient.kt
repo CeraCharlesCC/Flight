@@ -216,21 +216,27 @@ class CommandClient(
 
     private fun onGenericEvent(event: GenericEvent) {
         val key = event::class.java
+        val matched = mutableListOf<WaitingEvent<*>>()
 
-        pendingEvents.compute(key) { _, set ->
-            val events = set ?: return@compute null
-
-            val passed = events.filter { it.check(event) }
-            if (passed.isEmpty()) {
-                return@compute events
+        pendingEvents.computeIfPresent(key) { _, events ->
+            events.removeIf { waiter ->
+                if (waiter.check(event)) {
+                    matched += waiter
+                    true
+                } else {
+                    false
+                }
             }
-
-            events.removeAll(passed.toSet())
-            @Suppress("UNCHECKED_CAST")
-            passed.forEach { it.accept(event as Event) }
 
             if (events.isEmpty()) null else events
         }
+
+        if (matched.isEmpty()) {
+            return
+        }
+
+        val jdaEvent = event as Event
+        matched.forEach { it.accept(jdaEvent) }
     }
 
     inline fun <reified T : Event> waitFor(
