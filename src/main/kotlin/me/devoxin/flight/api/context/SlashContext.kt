@@ -153,19 +153,28 @@ class SlashContext(
     }
 
     internal fun defer0(ephemeral: Boolean): CompletableFuture<InteractionHook> {
-        if (!deferred) { // Idempotency handling
-            return event.deferReply(ephemeral).submit()
-                .thenApply { deferred = true; it }
+        if (event.isAcknowledged) {
+            return CompletableFuture.completedFuture(event.hook)
         }
 
-        return CompletableFuture.completedFuture(event.hook)
+        deferred = true
+        return event.deferReply(ephemeral).submit()
     }
 
     internal fun respond0(message: MessageCreateData, ephemeral: Boolean = false): CompletableFuture<*> {
         return when {
-            replied -> event.hook.sendMessage(message).setEphemeral(ephemeral).submit()
-            deferred -> event.hook.editOriginal(MessageEditData.fromCreateData(message)).submit().thenApply { replied = true; it }
-            else -> event.reply(message).setEphemeral(ephemeral).submit().thenApply { replied = true; it }
+            replied -> event.hook.sendMessage(message)
+                .setEphemeral(ephemeral)
+                .submit()
+
+            event.isAcknowledged -> event.hook.editOriginal(MessageEditData.fromCreateData(message))
+                .submit()
+                .thenApply { replied = true; it }
+
+            else -> event.reply(message)
+                .setEphemeral(ephemeral)
+                .submit()
+                .thenApply { replied = true; it }
         }
     }
 }

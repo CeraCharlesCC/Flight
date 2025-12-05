@@ -1,20 +1,29 @@
 package me.devoxin.flight.api.entities
 
-import me.devoxin.flight.api.CommandFunction
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
-import kotlin.math.abs
+import me.devoxin.flight.api.CommandFunction
 
 class DefaultCooldownProvider : CooldownProvider {
     private val buckets = ConcurrentHashMap<BucketType, Bucket>()
+
+    override fun tryAcquire(
+            id: Long,
+            bucketType: BucketType,
+            time: Long,
+            command: CommandFunction
+    ): Boolean {
+        val bucket = buckets.computeIfAbsent(bucketType) { Bucket() }
+        return bucket.tryAcquire(id, command.name, time)
+    }
 
     override fun isOnCooldown(id: Long, bucket: BucketType, command: CommandFunction): Boolean {
         return buckets[bucket]?.isOnCooldown(id, command.name) ?: false
     }
 
     override fun getCooldownTime(id: Long, bucket: BucketType, command: CommandFunction): Long {
-        return buckets[bucket]?.getCooldownRemainingTime(id, command.name) ?: 0
+        return buckets[bucket]?.getCooldownRemainingTime(id, command.name) ?: 0L
     }
 
     override fun setCooldown(id: Long, bucket: BucketType, time: Long, command: CommandFunction) {
@@ -37,36 +46,105 @@ class DefaultCooldownProvider : CooldownProvider {
         buckets.values.forEach { it.empty() }
     }
 
+    override fun shutdown() {
+        buckets.values.forEach { it.shutdown() }
+        buckets.clear()
+    }
 
-    inner class Bucket {
+    class Bucket {
         private val sweeperThread = Executors.newSingleThreadScheduledExecutor()
-        private val cooldowns = ConcurrentHashMap<Long, MutableSet<Cooldown>>() // EntityID => [Commands...]
+        private val cooldowns = ConcurrentHashMap<Long, MutableMap<String, Long>>()
+
+        fun tryAcquire(id: Long, commandName: String, time: Long): Boolean {
+            val now = System.currentTimeMillis()
+            val expiresAt = now + time
+
+            var acquired = false
+
+            cooldowns.compute(id) { _, existing ->
+                val map = (existing ?: ConcurrentHashMap<String, Long>())
+
+                val current = map[commandName]
+                if (current == null || current <= now) {
+                    map[commandName] = expiresAt
+                    acquired = true
+                }
+
+                map.ifEmpty { null }
+            }
+
+            if (acquired) {
+                scheduleCooldownCleanup(id, commandName, expiresAt, time)
+            }
+
+            return acquired
+        }
 
         fun isOnCooldown(id: Long, commandName: String): Boolean {
-            return getCooldownRemainingTime(id, commandName) > 0
+            return getCooldownRemainingTime(id, commandName) > 0L
         }
 
         fun getCooldownRemainingTime(id: Long, commandName: String): Long {
-            val cd = cooldowns[id]?.firstOrNull { it.name == commandName }
-                ?: return 0
-
-            return abs(cd.expires - System.currentTimeMillis())
+            val expiresAt = cooldowns[id]?.get(commandName) ?: return 0L
+            val remaining = expiresAt - System.currentTimeMillis()
+            return remaining.coerceAtLeast(0L)
         }
 
         fun setCooldown(id: Long, time: Long, commandName: String) {
-            val cds = cooldowns.computeIfAbsent(id) { mutableSetOf() }
-            val cooldown = Cooldown(commandName, System.currentTimeMillis() + time)
-            cds.add(cooldown)
+            val expiresAt = System.currentTimeMillis() + time
 
-            sweeperThread.schedule({ cds.remove(cooldown) }, time, TimeUnit.MILLISECONDS)
+            cooldowns.compute(id) { _, existing ->
+                val entityCooldowns = (existing ?: ConcurrentHashMap())
+                entityCooldowns[commandName] = expiresAt
+                entityCooldowns
+            }
+
+            scheduleCooldownCleanup(id, commandName, expiresAt, time)
+        }
+
+        private fun scheduleCooldownCleanup(
+                id: Long,
+                commandName: String,
+                expiresAt: Long,
+                delay: Long
+        ) {
+            sweeperThread.schedule(
+                    {
+                        val now = System.currentTimeMillis()
+
+                        cooldowns.compute(id) { _, map ->
+                            if (map == null) {
+                                return@compute null
+                            }
+
+                            val stored = map[commandName]
+
+                            if (stored != null && stored == expiresAt && stored <= now) {
+                                map.remove(commandName)
+                            }
+
+                            map.ifEmpty { null }
+                        }
+                    },
+                    delay,
+                    TimeUnit.MILLISECONDS
+            )
         }
 
         fun removeCooldown(id: Long, commandName: String) {
-            cooldowns[id]?.removeIf { it.name == commandName }
+            cooldowns.computeIfPresent(id) { _, map ->
+                map.remove(commandName)
+                map.ifEmpty { null }
+            }
         }
 
         fun clearCooldown(commandName: String) {
-            cooldowns.values.forEach { it.removeIf { cd -> cd.name == commandName } }
+            cooldowns.keys.forEach { id ->
+                cooldowns.computeIfPresent(id) { _, map ->
+                    map.remove(commandName)
+                    map.ifEmpty { null }
+                }
+            }
         }
 
         fun clearCooldowns(id: Long) {
@@ -76,20 +154,10 @@ class DefaultCooldownProvider : CooldownProvider {
         fun empty() {
             cooldowns.clear()
         }
-    }
 
-    inner class Cooldown(val name: String, val expires: Long) {
-        override fun equals(other: Any?): Boolean {
-            if (this === other) return true
-            if (javaClass != other?.javaClass) return false
-
-            other as Cooldown
-
-            return name == other.name
-        }
-
-        override fun hashCode(): Int {
-            return 31 * name.hashCode()
+        fun shutdown() {
+            sweeperThread.shutdownNow()
+            cooldowns.clear()
         }
     }
 }

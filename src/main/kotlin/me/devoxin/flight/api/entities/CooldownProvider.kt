@@ -103,4 +103,32 @@ interface CooldownProvider {
      * Clears all cool-downs stored in this provider.
      */
     fun clearCooldowns()
+
+    /**
+     * Shutdown the cool-down provider, performing any necessary cleanup.
+     */
+    fun shutdown()
+
+
+    /**
+     * Checks and acquires the cooldown for the given id and bucket; !!!BASICALLY YOU MUST CALL THIS METHOD
+     * INSTEAD OF CALLING isOnCooldown + setCooldown MANUALLY!!!
+     * @param id
+     *        The ID of the entity. If the bucket type is USER, this will be a user ID.
+     *        If the bucket type is GUILD, this will be the guild id.
+     *        If the bucket type is GLOBAL, this will be -1.
+     *
+     * @param bucketType
+     *        The type of bucket the cool-down belongs to.
+     *        USER, GUILD, GLOBAL
+     *
+     * @param time
+     *       How long the cool-down should last for, in milliseconds.
+     *
+     * @param command
+     *       The command that was invoked.
+     *
+     * @return true if the cooldown was successfully acquired (not already active), false otherwise.
+     */
+    fun tryAcquire(id: Long, bucketType: BucketType, time: Long, command: CommandFunction): Boolean
 }

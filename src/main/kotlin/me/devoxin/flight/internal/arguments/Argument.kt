@@ -139,6 +139,8 @@ class Argument(
                                         mapping.asDouble.toFloat()
                                 else -> mapping.asDouble
                             }
+
+                    OptionType.ATTACHMENT -> mapping.asAttachment
                     else ->
                             throw IllegalStateException(
                                     "Unsupported OptionType ${mapping.type.name}"

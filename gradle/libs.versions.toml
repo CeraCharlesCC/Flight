@@ -1,0 +1,19 @@
+[versions]
+kotlin = "2.2.0"
+shadow = "8.1.1"
+coroutines = "1.10.0"
+jda = "6.1.2"
+reflections = "0.10.2"
+slf4j = "1.7.36"
+
+[libraries]
+kotlinx-coroutines-core = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-core", version.ref = "coroutines" }
+kotlinx-coroutines-jdk8 = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-jdk8", version.ref = "coroutines" }
+kotlin-reflect = { module = "org.jetbrains.kotlin:kotlin-reflect", version.ref = "kotlin" }
+reflections = { module = "org.reflections:reflections", version.ref = "reflections" }
+jda = { module = "net.dv8tion:JDA", version.ref = "jda" }
+slf4j-api = { module = "org.slf4j:slf4j-api", version.ref = "slf4j" }
+
+[plugins]
+kotlin-jvm = { id = "org.jetbrains.kotlin.jvm", version.ref = "kotlin" }
+shadow = { id = "com.github.johnrengelman.shadow", version.ref = "shadow" }

@@ -1,6 +1,6 @@
 package me.devoxin.flight.api
 
-import me.devoxin.flight.api.annotations.GuildIds
+import java.util.concurrent.ConcurrentHashMap
 import me.devoxin.flight.api.context.Context
 import me.devoxin.flight.api.context.ContextType
 import me.devoxin.flight.api.context.MessageContext
@@ -38,7 +38,7 @@ class CommandClient(
     val ownerIds: MutableSet<Long>
 ) : EventListener {
     private val waiterScheduler = Executors.newSingleThreadScheduledExecutor()
-    private val pendingEvents = hashMapOf<Class<*>, HashSet<WaitingEvent<*>>>()
+    private val pendingEvents = ConcurrentHashMap<Class<*>, MutableSet<WaitingEvent<*>>>()
     val commands = CommandRegistry()
 
     /**
@@ -61,6 +61,14 @@ class CommandClient(
         val command = args.removeAt(0).lowercase()
 
         return (commands[command] ?: commands.findCommandByAlias(command)) != null
+    }
+
+    /**
+     * Shuts down the internal waiter scheduler.
+     */
+    fun shutdown() {
+        waiterScheduler.shutdown()
+        cooldownProvider.shutdown()
     }
 
     private fun onMessageReceived(event: MessageReceivedEvent) {
@@ -208,29 +216,58 @@ class CommandClient(
     }
 
     private fun onGenericEvent(event: GenericEvent) {
-        val events = pendingEvents[event::class.java] ?: return
-        val passed = events.filter { it.check(event) }
+        val key = event::class.java
+        val matched = mutableListOf<WaitingEvent<*>>()
 
-        events.removeAll(passed)
-        passed.forEach { it.accept(event) }
+        pendingEvents.computeIfPresent(key) { _, events ->
+            events.removeIf { waiter ->
+                if (waiter.check(event)) {
+                    matched += waiter
+                    true
+                } else {
+                    false
+                }
+            }
+
+            if (events.isEmpty()) null else events
+        }
+
+        if (matched.isEmpty()) {
+            return
+        }
+
+        val jdaEvent = event as Event
+        matched.forEach { it.accept(jdaEvent) }
     }
 
-    inline fun <reified T: Event> waitFor(noinline predicate: (T) -> Boolean, timeout: Long): CompletableFuture<T> {
+    inline fun <reified T : Event> waitFor(
+        noinline predicate: (T) -> Boolean,
+        timeout: Long
+    ): CompletableFuture<T> {
         return waitFor(T::class.java, predicate, timeout)
     }
 
-    fun <T: Event> waitFor(event: Class<T>, predicate: (T) -> Boolean, timeout: Long): CompletableFuture<T> {
+    fun <T : Event> waitFor(
+        event: Class<T>,
+        predicate: (T) -> Boolean,
+        timeout: Long
+    ): CompletableFuture<T> {
         val future = CompletableFuture<T>()
         val we = WaitingEvent(event, predicate, future)
 
-        val set = pendingEvents.computeIfAbsent(event) { hashSetOf() }
+        val set = pendingEvents.computeIfAbsent(event) {
+            ConcurrentHashMap.newKeySet<WaitingEvent<*>>()
+        }
         set.add(we)
 
         if (timeout > 0) {
             waiterScheduler.schedule({
                 if (!future.isDone) {
                     future.completeExceptionally(TimeoutException())
-                    set.remove(we)
+
+                    pendingEvents.compute(event) { _, existing ->
+                        existing?.apply { remove(we) }?.takeIf { it.isNotEmpty() }
+                    }
                 }
             }, timeout, TimeUnit.MILLISECONDS)
         }
