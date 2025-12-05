@@ -111,7 +111,7 @@ interface CooldownProvider {
 
 
     /**
-     * checks and acquires the cooldown for the given id and bucket; !!!BASICALLY YOU MUST CALL THIS METHOD
+     * Checks and acquires the cooldown for the given id and bucket; !!!BASICALLY YOU MUST CALL THIS METHOD
      * INSTEAD OF CALLING isOnCooldown + setCooldown MANUALLY!!!
      * @param id
      *        The ID of the entity. If the bucket type is USER, this will be a user ID.
