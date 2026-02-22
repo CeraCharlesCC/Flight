@@ -1,8 +1,8 @@
-# Flight
-[![Release](https://jitpack.io/v/devoxin/flight.svg)](https://jitpack.io/#devoxin/flight)
-[![](https://jitci.com/gh/devoxin/flight/svg)](https://jitci.com/gh/devoxin/flight)
+# Flight-jda6
+[![Release](https://jitpack.io/v/ceracharlescc/flight.svg)](https://jitpack.io/#ceracharlescc/flight)
+[![](https://jitci.com/gh/ceracharlescc/flight/svg)](https://jitci.com/gh/ceracharlescc/flight)
 
-Flight is a lightweight yet powerful command handler and arg parser for JDA, in Kotlin. It offers numerous utilities and functions for assisting, and speeding up Discord Bot development, allowing you to spend less time on the boring bits, and more on the important bits.
+Flight-jda6 is a lightweight yet powerful command handler and arg parser for JDA, in Kotlin. It offers numerous utilities and functions for assisting, and speeding up Discord Bot development, allowing you to spend less time on the boring bits, and more on the important bits. 
 
 ## Quick Start
 Using Flight is easy. The first thing you need to do before you can start diving in to bot making is to import it into your project.
@@ -12,7 +12,7 @@ repositories {
 }
 
 dependencies {
-  compile 'com.github.Devoxin:Flight:VERSION'
+  compile 'com.github.ceracharlescc:Flight:VERSION'
 }
 ```
 Make sure to replace `VERSION` with the latest Flight version. You can find a list of versions in the releases tab.
