@@ -30,10 +30,16 @@ val commandClient = CommandClientBuilder()
 
 Now that we have our command client, we need to create our JDA client to connect our bot to Discord so we can start receiving and processing events.
 ```kotlin
+import net.dv8tion.jda.api.hooks.AnnotatedEventManager
+
 val jda = JDABuilder(yourBotToken)
-  .addEventListeners(commandClient) // It's necessary to register our command client as an event listener so that it can process commands. This is also necessary for event waiting.
+  .setEventManager(AnnotatedEventManager()) // Required: Flight-jda6 now uses @SubscribeEvent.
+  .addEventListeners(commandClient) // Register commandClient so it can process commands and waitFor events.
   .build()
 ```
+
+> **Breaking change:** `CommandClient` is now supported only with `AnnotatedEventManager`.
+> `InterfacedEventManager` is not supported.
 
 ### Commands
 Now for the part you've been waiting for -- commands!

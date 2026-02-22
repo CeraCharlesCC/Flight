@@ -17,7 +17,7 @@ import net.dv8tion.jda.api.events.interaction.command.CommandAutoCompleteInterac
 import net.dv8tion.jda.api.events.interaction.command.SlashCommandInteractionEvent
 import net.dv8tion.jda.api.events.message.MessageReceivedEvent
 import net.dv8tion.jda.api.events.session.ReadyEvent
-import net.dv8tion.jda.api.hooks.EventListener
+import net.dv8tion.jda.api.hooks.SubscribeEvent
 import org.slf4j.LoggerFactory
 import java.util.concurrent.*
 import kotlin.reflect.KParameter
@@ -29,7 +29,7 @@ class CommandClient(
     private val eventListeners: List<CommandEventAdapter>,
     private val commandExecutor: ExecutorService?,
     val ownerIds: MutableSet<Long>
-) : EventListener {
+) {
     private val waiterScheduler = Executors.newSingleThreadScheduledExecutor()
     private val pendingEvents = ConcurrentHashMap<Class<*>, MutableSet<WaitingEvent<*>>>()
     val commands = CommandRegistry()
@@ -185,7 +185,8 @@ class CommandClient(
     // +-------------------+
     // | Execution-Related |
     // +-------------------+
-    override fun onEvent(event: GenericEvent) {
+    @SubscribeEvent
+    fun onEvent(event: GenericEvent) {
         onGenericEvent(event)
 
         try {
