@@ -1,8 +1,9 @@
-package me.devoxin.flight.api.entities
+package me.devoxin.flight.api.command
 
 import me.devoxin.flight.api.CommandFunction
 import me.devoxin.flight.api.annotations.GuildIds
 import me.devoxin.flight.api.context.ContextType.SLASH
+import me.devoxin.flight.api.util.ObjectStorage
 import me.devoxin.flight.internal.arguments.Argument
 import me.devoxin.flight.internal.entities.Jar
 import me.devoxin.flight.internal.utils.Indexer
@@ -93,11 +94,10 @@ class CommandRegistry : HashMap<String, CommandFunction>() {
         commands.map(CommandFunction::cog).let(::doUnload)
 
         val jar = commands.firstOrNull { it.jar != null }?.jar
-            ?: return // No commands loaded from jar, thus no classloader to close.
+            ?: return
 
         val canCloseLoader = values.none { it.jar == jar }
 
-        // No other commands were loaded from the jar, so it's safe to close the loader.
         if (canCloseLoader) {
             jar.close()
         }

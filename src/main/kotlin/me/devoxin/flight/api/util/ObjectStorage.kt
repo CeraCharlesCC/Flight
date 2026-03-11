@@ -1,4 +1,4 @@
-package me.devoxin.flight.api.entities
+package me.devoxin.flight.api.util
 
 import java.util.concurrent.ConcurrentHashMap
 import kotlin.collections.MutableMap.MutableEntry

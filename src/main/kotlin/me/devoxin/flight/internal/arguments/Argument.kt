@@ -6,7 +6,7 @@ import kotlinx.coroutines.launch
 import me.devoxin.flight.api.annotations.Choices
 import me.devoxin.flight.api.annotations.Describe
 import me.devoxin.flight.api.annotations.Range
-import me.devoxin.flight.api.entities.Cog
+import me.devoxin.flight.api.command.Cog
 import me.devoxin.flight.internal.utils.EnumUtils
 import net.dv8tion.jda.api.entities.Member
 import net.dv8tion.jda.api.entities.Message

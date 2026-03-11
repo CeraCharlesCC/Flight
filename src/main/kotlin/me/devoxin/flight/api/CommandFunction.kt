@@ -2,10 +2,10 @@ package me.devoxin.flight.api
 
 import me.devoxin.flight.api.annotations.Command
 import me.devoxin.flight.api.annotations.Cooldown
+import me.devoxin.flight.api.command.Cog
 import me.devoxin.flight.api.context.ContextType
 import me.devoxin.flight.api.context.MessageContext
 import me.devoxin.flight.api.context.SlashContext
-import me.devoxin.flight.api.entities.Cog
 import me.devoxin.flight.internal.arguments.Argument
 import me.devoxin.flight.internal.entities.Executable
 import me.devoxin.flight.internal.entities.Jar

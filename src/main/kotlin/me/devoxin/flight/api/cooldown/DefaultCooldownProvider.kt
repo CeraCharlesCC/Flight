@@ -1,4 +1,4 @@
-package me.devoxin.flight.api.entities
+package me.devoxin.flight.api.cooldown
 
 import me.devoxin.flight.api.CommandFunction
 import java.util.concurrent.ConcurrentHashMap
@@ -62,7 +62,7 @@ class DefaultCooldownProvider : CooldownProvider {
             var acquired = false
 
             cooldowns.compute(id) { _, existing ->
-                val map = (existing ?: ConcurrentHashMap<String, Long>())
+                val map = existing ?: ConcurrentHashMap<String, Long>()
 
                 val current = map[commandName]
                 if (current == null || current <= now) {
@@ -94,7 +94,7 @@ class DefaultCooldownProvider : CooldownProvider {
             val expiresAt = System.currentTimeMillis() + time
 
             cooldowns.compute(id) { _, existing ->
-                val entityCooldowns = (existing ?: ConcurrentHashMap())
+                val entityCooldowns = existing ?: ConcurrentHashMap()
                 entityCooldowns[commandName] = expiresAt
                 entityCooldowns
             }

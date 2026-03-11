@@ -2,7 +2,7 @@ package me.devoxin.flight.api.context
 
 import kotlinx.coroutines.future.await
 import me.devoxin.flight.api.CommandClient
-import me.devoxin.flight.api.entities.DSLMessageCreateBuilder
+import me.devoxin.flight.api.util.DSLMessageCreateBuilder
 import me.devoxin.flight.internal.entities.Executable
 import net.dv8tion.jda.api.JDA
 import net.dv8tion.jda.api.entities.Message

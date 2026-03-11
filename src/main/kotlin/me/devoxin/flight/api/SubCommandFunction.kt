@@ -1,7 +1,7 @@
 package me.devoxin.flight.api
 
 import me.devoxin.flight.api.annotations.SubCommand
-import me.devoxin.flight.api.entities.Cog
+import me.devoxin.flight.api.command.Cog
 import me.devoxin.flight.internal.arguments.Argument
 import me.devoxin.flight.internal.entities.Executable
 import kotlin.reflect.KFunction

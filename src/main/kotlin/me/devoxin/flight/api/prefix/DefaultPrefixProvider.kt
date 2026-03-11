@@ -1,4 +1,4 @@
-package me.devoxin.flight.api.entities
+package me.devoxin.flight.api.prefix
 
 import net.dv8tion.jda.api.entities.Message
 
@@ -20,5 +20,4 @@ class DefaultPrefixProvider(
 
         return prefixes.toList()
     }
-
 }

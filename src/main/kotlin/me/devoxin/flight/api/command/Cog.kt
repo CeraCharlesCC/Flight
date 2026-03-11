@@ -1,4 +1,4 @@
-package me.devoxin.flight.api.entities
+package me.devoxin.flight.api.command
 
 import me.devoxin.flight.api.CommandFunction
 import me.devoxin.flight.api.context.Context
@@ -25,11 +25,9 @@ interface Cog {
      */
     fun localCheck(ctx: Context, command: CommandFunction): Boolean = true
 
-
     /**
      * Invoked when this Cog gets unloaded, usually through [CommandRegistry.unload].
      * This can be used as a last-ditch attempt to clean up, or shut down any resources.
      */
     fun unload(): Unit = Unit
-
 }

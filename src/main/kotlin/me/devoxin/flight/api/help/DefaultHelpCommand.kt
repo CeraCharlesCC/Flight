@@ -1,11 +1,15 @@
-package me.devoxin.flight.api.entities
+package me.devoxin.flight.api.help
 
 import me.devoxin.flight.api.CommandFunction
 import me.devoxin.flight.api.annotations.Command
+import me.devoxin.flight.api.command.Cog
 import me.devoxin.flight.api.context.MessageContext
 import me.devoxin.flight.internal.utils.TextUtils
 
-open class DefaultHelpCommand(private val showParameterTypes: Boolean) : Cog {
+open class DefaultHelpCommand(
+    private val showParameterTypes: Boolean,
+    private val messages: HelpMessages = HelpMessages()
+) : Cog {
     override fun name() = "No Category"
 
     @Command(aliases = ["commands", "cmds"], description = "Displays bot help.")
@@ -18,7 +22,7 @@ open class DefaultHelpCommand(private val showParameterTypes: Boolean) : Cog {
             when {
                 cmd != null -> buildCommandHelp(ctx, cmd)
                 else -> commands.findCogByName(command)?.let { cog -> buildCogHelp(ctx, cog) }
-            } ?: return ctx.send("No commands or cogs found with that name.")
+            } ?: return ctx.send(messages.noCommandOrCogFound)
 
         } ?: buildCommandList(ctx)
 
@@ -77,7 +81,8 @@ open class DefaultHelpCommand(private val showParameterTypes: Boolean) : Cog {
     }
 
     open fun buildCogHelp(ctx: MessageContext, cog: Cog): List<String> {
-        val builder = StringBuilder("Commands in ${cog::class.simpleName}\n")
+        val title = messages.formatCommandsInCog(cog::class.simpleName ?: "Unknown")
+        val builder = StringBuilder(title).append("\n")
         val commands = ctx.commandClient.commands.findCommandsByCog(cog).filter { !it.properties.hidden }
         val padLength = ctx.commandClient.commands.values.maxOf { it.name.length }
 
@@ -93,11 +98,9 @@ open class DefaultHelpCommand(private val showParameterTypes: Boolean) : Cog {
         return TextUtils.split(builder.toString(), 1990)
     }
 
-    // TODO: Subcommand help
-
     open suspend fun sendPages(ctx: MessageContext, pages: Collection<String>) {
         for (page in pages) {
-            ctx.sendAsync("```\n$page```")
+            ctx.sendAsync(messages.formatPage(page))
         }
     }
 }

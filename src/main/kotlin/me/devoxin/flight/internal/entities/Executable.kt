@@ -3,8 +3,8 @@ package me.devoxin.flight.internal.entities
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import me.devoxin.flight.api.command.Cog
 import me.devoxin.flight.api.context.Context
-import me.devoxin.flight.api.entities.Cog
 import me.devoxin.flight.internal.arguments.Argument
 import net.dv8tion.jda.api.interactions.commands.OptionMapping
 import net.dv8tion.jda.api.interactions.commands.OptionType

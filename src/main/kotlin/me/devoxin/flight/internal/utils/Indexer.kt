@@ -3,9 +3,9 @@ package me.devoxin.flight.internal.utils
 import me.devoxin.flight.api.CommandFunction
 import me.devoxin.flight.api.SubCommandFunction
 import me.devoxin.flight.api.annotations.*
+import me.devoxin.flight.api.command.Cog
 import me.devoxin.flight.api.context.Context
-import me.devoxin.flight.api.entities.Cog
-import me.devoxin.flight.api.entities.ObjectStorage
+import me.devoxin.flight.api.util.ObjectStorage
 import me.devoxin.flight.internal.arguments.Argument
 import me.devoxin.flight.internal.entities.Jar
 import org.reflections.Reflections

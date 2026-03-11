@@ -1,4 +1,4 @@
-package me.devoxin.flight.api.entities
+package me.devoxin.flight.api.util
 
 import net.dv8tion.jda.api.EmbedBuilder
 import net.dv8tion.jda.api.utils.messages.MessageCreateBuilder
