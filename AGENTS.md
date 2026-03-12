@@ -1,0 +1,2 @@
+- This repository is a hard fork that has also left the fork network.
+- Therefore, there is no need to worry about backward compatibility.

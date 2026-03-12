@@ -24,7 +24,13 @@ dependencies {
     compileOnly(libs.jda)
     api(libs.slf4j.api)
 
+    testImplementation(kotlin("test"))
     testImplementation(libs.jda)
+    testImplementation("net.sf.trove4j:trove4j:3.0.3")
+}
+
+tasks.test {
+    useJUnitPlatform()
 }
 
 tasks.withType<KotlinCompile> {

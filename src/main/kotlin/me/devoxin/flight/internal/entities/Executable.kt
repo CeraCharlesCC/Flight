@@ -1,14 +1,10 @@
 package me.devoxin.flight.internal.entities
 
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.launch
+import me.devoxin.flight.api.annotations.Timeout
+import me.devoxin.flight.api.command.Cog
 import me.devoxin.flight.api.context.Context
-import me.devoxin.flight.api.entities.Cog
 import me.devoxin.flight.internal.arguments.Argument
 import net.dv8tion.jda.api.interactions.commands.OptionMapping
-import net.dv8tion.jda.api.interactions.commands.OptionType
-import java.util.concurrent.ExecutorService
 import kotlin.reflect.KFunction
 import kotlin.reflect.KParameter
 import kotlin.reflect.full.callSuspendBy
@@ -19,8 +15,12 @@ abstract class Executable(
     val method: KFunction<*>,
     val cog: Cog,
     val arguments: List<Argument>,
-    val contextParameter: KParameter
+    val contextParameter: KParameter,
+    val timeout: Timeout?
 ) {
+    val isSuspendHandler: Boolean
+        get() = method.isSuspend
+
     fun resolveArguments(options: List<OptionMapping>): HashMap<KParameter, Any?> {
         val mapping = hashMapOf<KParameter, Any?>()
 
@@ -40,62 +40,39 @@ abstract class Executable(
                 throw IllegalStateException("Missing option for argument ${argument.name}")
             }
 
-            mapping += if (option.type == OptionType.INTEGER && (argument.type == Integer::class.java || argument.type == Integer::class.java)) {
-                val (param, value) = argument.getEntityFromOptionMapping(option)
-                @Suppress("PLATFORM_CLASS_MAPPED_TO_KOTLIN")
-                param to (value as java.lang.Long).toInt()
-            } else {
-                argument.getEntityFromOptionMapping(option)
-            }
+            mapping += argument.getEntityFromOptionMapping(option)
         }
 
         return mapping
     }
 
-    open fun execute(
+    fun bindArguments(
         ctx: Context,
-        args: HashMap<KParameter, Any?>,
-        complete: (Boolean, Throwable?) -> Unit,
-        executor: ExecutorService?
-    ) {
-        method.instanceParameter?.let { args[it] = cog }
-        args[contextParameter] = ctx
-
-        if (method.isSuspend) {
-            DEFAULT_DISPATCHER.launch {
-                executeAsync(args, complete)
-            }
-        } else {
-            executor?.execute { executeSync(args, complete) }
-                ?: executeSync(args, complete)
+        args: HashMap<KParameter, Any?>
+    ): HashMap<KParameter, Any?> {
+        return HashMap(args).apply {
+            method.instanceParameter?.let { put(it, cog) }
+            put(contextParameter, ctx)
         }
     }
 
-    /**
-     * Calls the related method with the given args.
-     */
-    private fun executeSync(args: HashMap<KParameter, Any?>, complete: (Boolean, Throwable?) -> Unit) {
+    fun invokeBlocking(args: Map<KParameter, Any?>) {
         try {
             method.callBy(args)
-            complete(true, null)
-        } catch (e: Throwable) {
-            complete(false, e.cause ?: e)
+        } catch (throwable: Throwable) {
+            throw unwrapInvocationFailure(throwable)
         }
     }
 
-    /**
-     * Calls the related method with the given args, except in an async manner.
-     */
-    private suspend fun executeAsync(args: HashMap<KParameter, Any?>, complete: (Boolean, Throwable?) -> Unit) {
+    suspend fun invokeSuspend(args: Map<KParameter, Any?>) {
         try {
             method.callSuspendBy(args)
-            complete(true, null)
-        } catch (e: Throwable) {
-            complete(false, e.cause ?: e)
+        } catch (throwable: Throwable) {
+            throw unwrapInvocationFailure(throwable)
         }
     }
 
-    companion object {
-        private val DEFAULT_DISPATCHER = CoroutineScope(Dispatchers.Default)
+    fun unwrapInvocationFailure(throwable: Throwable): Throwable {
+        return throwable.cause ?: throwable
     }
 }

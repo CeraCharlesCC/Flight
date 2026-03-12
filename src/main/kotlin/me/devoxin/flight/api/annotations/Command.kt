@@ -3,8 +3,10 @@ package me.devoxin.flight.api.annotations
 import net.dv8tion.jda.api.Permission
 
 /**
- * Marks a function as a command. This should be used to annotate methods within a cog
- * as commands, so that the scanner can detect them, and register them.
+ * Marks a function as a standard Flight command.
+ *
+ * Standard commands may be message-only, slash-only, or message+slash depending on the
+ * declared context parameter type.
  */
 @Retention(AnnotationRetention.RUNTIME)
 @Target(AnnotationTarget.FUNCTION)

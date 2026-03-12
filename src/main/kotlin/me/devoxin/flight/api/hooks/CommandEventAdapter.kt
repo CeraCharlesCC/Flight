@@ -1,8 +1,8 @@
 package me.devoxin.flight.api.hooks
 
 import me.devoxin.flight.api.CommandFunction
+import me.devoxin.flight.api.check.CheckType
 import me.devoxin.flight.api.context.Context
-import me.devoxin.flight.api.entities.CheckType
 import me.devoxin.flight.api.exceptions.BadArgument
 import net.dv8tion.jda.api.Permission
 import net.dv8tion.jda.api.events.interaction.command.CommandAutoCompleteInteractionEvent
@@ -63,6 +63,11 @@ interface CommandEventAdapter {
 
     /**
      * Invoked when a command encounters an error during execution.
+        *
+        * Implementations may receive typed execution failures such as
+        * [me.devoxin.flight.api.exceptions.CommandTimeoutException],
+        * [me.devoxin.flight.api.exceptions.CommandCancelledException], and
+        * [me.devoxin.flight.api.exceptions.CommandInvocationException].
      */
     fun onCommandError(ctx: Context, command: CommandFunction, error: Throwable)
 
@@ -80,6 +85,11 @@ interface CommandEventAdapter {
 
     /**
      * Invoked when an autocomplete handler encounters an error during execution.
+        *
+        * Implementations may receive typed execution failures such as
+        * [me.devoxin.flight.api.exceptions.AutocompleteTimeoutException],
+        * [me.devoxin.flight.api.exceptions.AutocompleteCancelledException], and
+        * [me.devoxin.flight.api.exceptions.AutocompleteInvocationException].
      */
     fun onAutocompleteError(event: CommandAutoCompleteInteractionEvent, error: Throwable)
 

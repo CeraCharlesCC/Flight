@@ -1,8 +1,8 @@
 package me.devoxin.flight.api.annotations
 
 /**
- * Describes an argument for a command.
- * This is only used by [me.devoxin.flight.internal.entities.CommandRegistry.toDiscordCommands].
+ * Describes an argument for a slash-exportable command option.
+ * This is only used when Flight exports or synchronizes application commands.
  */
 @Retention(AnnotationRetention.RUNTIME)
 @Target(AnnotationTarget.VALUE_PARAMETER)

@@ -20,12 +20,27 @@ Make sure to replace `VERSION` with the latest Flight version. You can find a li
 ### Command Client
 Now that importing Flight is out of the way, we can begin constructing our command client.
 ```kotlin
-val commandClient = CommandClientBuilder()
+val commandClient = CommandClient.builder()
   .setPrefixes("!", "?") // You can use multiple prefixes with Flight.
   .registerDefaultParsers() // This registers all default parsers that ship with Flight. This allows us to make use of Flight's arg-parsing capabilities.
+  .register( // Explicit registration is the primary workflow and works well with DI-managed cog instances.
+    UtilityCog(),
+    ModerationCog(moderationService)
+  )
   .build() // There is a lot more we can configure, but the default values are fine for our needs.
 
 // Each builder option returns the Builder instance. This makes chaining calls easy.
+```
+
+If your application constructs cogs through a DI container, module system, or service locator, you can bulk-register them directly:
+```kotlin
+val containerCogs: List<Cog> = container.resolveAll()
+
+val commandClient = CommandClient.builder()
+  .setPrefixes("!")
+  .registerDefaultParsers()
+  .registerAll(containerCogs)
+  .build()
 ```
 
 Now that we have our command client, we need to create our JDA client to connect our bot to Discord so we can start receiving and processing events.
@@ -45,8 +60,6 @@ val jda = JDABuilder(yourBotToken)
 Now for the part you've been waiting for -- commands!
 Commands need to be contained inside a `Cog`. The cog serves not only as the container, but the category too -- so you can group commands based on what they do, for example; moderation. However we'll just be sticking with the basic `ping` command for now.
 ```kotlin
-package my.bot.commands // Your package name most likely won't be this, but this is included as it's necessary for registering commands with the command client.
-
 class YourCog : Cog { // "YourCog" will be used as the category name for commands within this cog.
 
   @Command(description = "Ping, pong!")
@@ -72,13 +85,13 @@ class SubcommandDemo : Cog {
     ctx.send("Hey! You must specify a subcommand.\nAvailable subcommands:\n`prefix` `locale`")
   }
   
-  @Subcommand(description = "Set the server prefix")
+  @SubCommand(description = "Set the server prefix")
   fun prefix(ctx: Context, newPrefix: String) {
     Database.updatePrefix(ctx.guild!!.idLong, newPrefix)
     ctx.send("The prefix was changed to `$newPrefix`.")
   }
   
-  @Subcommand(description = "Set the language of the bot for the server.")
+  @SubCommand(description = "Set the language of the bot for the server.")
   fun locale(ctx: Context, newLocale: String) {
     val selectedLocale = validateLocale(newLocale)
         ?: return ctx.send("That doesn't appear to be a valid locale.")
@@ -92,9 +105,31 @@ To execute our new subcommand, we would need to type `!settings prefix`. To pass
 Change the `!` as necessary to match your bot's prefix.
 
 #### Registering
-You now have your first cog and command, all that's left to do is register it! This is as easy as the following:
+You now have your first cog and command, all that's left to do is register it.
+
+The recommended approach is to register the exact cog instances you want to use when you build the client:
 ```kotlin
-commandClient.registerCommands("my.bot.commands")
+val commandClient = CommandClient.builder()
+  .setPrefixes("!")
+  .registerDefaultParsers()
+  .register(YourCog())
+  .build()
 ```
 
-You will need to change `my.bot.commands` to reflect the actual package name of where your commands are stored. If done correctly, all cogs and commands contained within the `my.bot.commands` package will be scanned and registered ready for use.
+You can also register multiple DI-managed cogs in one call:
+```kotlin
+val commandClient = CommandClient.builder()
+  .setPrefixes("!")
+  .registerDefaultParsers()
+  .registerAll(listOf(YourCog(), AdminCog(adminService)))
+  .build()
+```
+
+Package scanning still exists as an optional convenience if you want Flight to discover and construct cogs for you:
+```kotlin
+commandClient.commands.register("my.bot.commands")
+```
+
+If done correctly, all cogs and commands contained within `my.bot.commands` will be scanned and registered ready for use.
+
+> If you want to provide your own `help` command, disable Flight's default help command before registering your cog.

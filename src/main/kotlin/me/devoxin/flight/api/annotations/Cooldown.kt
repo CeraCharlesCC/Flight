@@ -1,6 +1,6 @@
 package me.devoxin.flight.api.annotations
 
-import me.devoxin.flight.api.entities.BucketType
+import me.devoxin.flight.api.cooldown.BucketType
 import java.util.concurrent.TimeUnit
 
 /**

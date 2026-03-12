@@ -15,6 +15,5 @@ gradle-app.setting
 
 .idea/
 out/
-src/test/*
 flight.txt
 *.log
