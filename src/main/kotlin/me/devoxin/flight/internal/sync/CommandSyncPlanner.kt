@@ -50,7 +50,10 @@ internal class CommandSyncPlanner(
             }
             .toMap()
 
-        val targetGuildIds = (guildTargets.keys + (allowedGuildIds ?: emptySet())).toSortedSet()
+        val naturalGuildIds = guildTargets
+            .filterValues { commands -> commands.any(CommandFunction::isApplicationCommand) }
+            .keys
+        val targetGuildIds = (naturalGuildIds + (allowedGuildIds ?: emptySet())).toSortedSet()
 
         for (guildId in targetGuildIds) {
             val guildCommands = guildTargets[guildId].orEmpty()

@@ -115,8 +115,9 @@ class CommandClient(
         val firstToken = args.getOrNull(0)
         val secondToken = args.getOrNull(1)
         val subcommand = cmd.findSubcommandPath(firstToken, secondToken, ContextType.MESSAGE)
+        val declaredDirectSubcommand = cmd.findSubcommand(firstToken)
 
-        if (subcommand == null && cmd.hasSubcommandGroup(firstToken)) {
+        if (subcommand == null && (declaredDirectSubcommand != null || cmd.hasSubcommandGroup(firstToken))) {
             return handleFailure(
                 CommandFailure.UnknownCommandFailure(event, command, args)
             ) { it.onUnknownCommand(event, command, args) }

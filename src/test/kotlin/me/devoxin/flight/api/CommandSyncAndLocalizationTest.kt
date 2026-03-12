@@ -344,6 +344,20 @@ class CommandSyncAndLocalizationTest {
     }
 
     @Test
+    fun `planCommandSync does not create natural guild targets for non application commands only`() {
+        val client = CommandClient.builder()
+            .setPrefixes("!")
+            .configureDefaultHelpCommand { enabled = false }
+            .build()
+
+        client.commands.register(MessageOnlyGuildSyncCog())
+
+        val plan = client.planCommandSync(CommandSyncOptions(dryRun = true, includeGlobal = false))
+
+        assertTrue(plan.targets.none { it.scope == CommandSyncScope.Guild(55L) })
+    }
+
+    @Test
     fun `command sync executor continues after one target fails`() {
         val alpha = CommandSyncCommand("alpha", JdaCommand.Type.SLASH, "Alpha command")
         val beta = CommandSyncCommand("beta", JdaCommand.Type.SLASH, "Beta command")
@@ -654,6 +668,12 @@ private class SyncPlanningCog : Cog {
     @GuildIds([2L, 1L])
     @Command(description = "Guild message")
     fun guildmessage(ctx: MessageContext) = Unit
+}
+
+private class MessageOnlyGuildSyncCog : Cog {
+    @GuildIds([55L])
+    @Command(description = "Message only")
+    fun localMessage(ctx: MessageContext) = Unit
 }
 
 private class RestrictedUserCommandCog : Cog {

@@ -134,6 +134,26 @@ class SubcommandGroupDispatchTest {
     }
 
     @Test
+    fun `prefix dispatch rejects declared direct subcommands that do not support message context`() {
+        val adapter = UnknownCommandRecordingAdapter()
+        val client = CommandClient.builder()
+            .setPrefixes("!")
+            .setAllowMentionPrefix(false)
+            .addEventListeners(adapter)
+            .configureDefaultHelpCommand { enabled = false }
+            .build()
+        val cog = ContextRestrictedDispatchCog()
+        client.commands.register(cog)
+
+        client.onEvent(messageReceivedEvent("!hybrid inspect"))
+
+        assertEquals(0, cog.rootInvocationCount)
+        assertNull(cog.lastInvocation)
+        assertEquals("hybrid", adapter.lastUnknownCommand)
+        assertContentEquals(listOf("inspect"), adapter.lastUnknownArgs)
+    }
+
+    @Test
     fun `autocomplete resolves grouped subcommands with duplicate child names`() {
         val client = CommandClient.builder()
             .setPrefixes("!")
@@ -204,6 +224,22 @@ class GroupedAutocompleteCog : Cog {
 
     @SubCommand(parent = "search", group = "crew", name = "create", description = "Create crew")
     fun createCrew(ctx: SlashContext, @Autocomplete(CrewAutocompleteHandler::class) query: String) = Unit
+}
+
+class ContextRestrictedDispatchCog : Cog {
+    var rootInvocationCount: Int = 0
+    var lastInvocation: String? = null
+
+    @Command(description = "Hybrid operations")
+    fun hybrid(ctx: Context) {
+        rootInvocationCount += 1
+        lastInvocation = "root"
+    }
+
+    @SubCommand(parent = "hybrid", description = "Inspect")
+    fun inspect(ctx: SlashContext) {
+        lastInvocation = "inspect"
+    }
 }
 
 object BookingAutocompleteHandler : AutocompleteHandler<GroupedAutocompleteCog> {
