@@ -16,8 +16,8 @@ open class DefaultHelpCommand(
     open suspend fun help(ctx: MessageContext, command: String?) {
         val pages = command?.let {
             val commands = ctx.commandClient.commands
-            val cmd = commands.findCommandByName(it)
-                ?: commands.findCommandByAlias(it)
+            val cmd = commands.findMessageCommand(it)
+                ?: commands.findCommandByName(it)?.takeIf(CommandFunction::isPrefixCapable)
 
             when {
                 cmd != null -> buildCommandHelp(ctx, cmd)
@@ -31,15 +31,19 @@ open class DefaultHelpCommand(
 
     open fun buildCommandList(ctx: MessageContext): List<String> {
         val helpMenu = StringBuilder()
-        val commands = ctx.commandClient.commands.values.filter { !it.properties.hidden }
-        val padLength = ctx.commandClient.commands.values.maxOf { it.name.length }
+        val commands = ctx.commandClient.commands.values.filter { it.isPrefixCapable && !it.properties.hidden }
+        if (commands.isEmpty()) {
+            return listOf(messages.noCommandOrCogFound)
+        }
+
+        val padLength = commands.maxOf { it.name.length }
         val categories = commands.groupBy { it.category.lowercase() }.mapValues { it.value.toSet() }
 
         for (entry in categories.entries.sortedBy { it.key }) {
             helpMenu.append(TextUtils.toTitleCase(entry.key)).append("\n")
 
             for (cmd in entry.value.sortedBy { it.name }) {
-                val description = cmd.properties.description
+                val description = cmd.properties.description ?: "No description available"
 
                 helpMenu.apply {
                     append("  ")
@@ -76,21 +80,27 @@ open class DefaultHelpCommand(
             builder.append(arg.format(showParameterTypes)).append(" ")
         }
 
-        builder.append("\n\n").append(properties.description)
+        builder.append("\n\n").append(properties.description ?: "No description available")
         return listOf(builder.toString())
     }
 
     open fun buildCogHelp(ctx: MessageContext, cog: Cog): List<String> {
         val title = messages.formatCommandsInCog(cog::class.simpleName ?: "Unknown")
         val builder = StringBuilder(title).append("\n")
-        val commands = ctx.commandClient.commands.findCommandsByCog(cog).filter { !it.properties.hidden }
-        val padLength = ctx.commandClient.commands.values.maxOf { it.name.length }
+        val commands = ctx.commandClient.commands.findCommandsByCog(cog)
+            .filter { it.isPrefixCapable && !it.properties.hidden }
+
+        if (commands.isEmpty()) {
+            return listOf(title)
+        }
+
+        val padLength = commands.maxOf { it.name.length }
 
         for (command in commands) {
             builder.apply {
                 append(" ")
                 append(command.name.padEnd(padLength + 1, ' '))
-                append(TextUtils.truncate(command.properties.description, 100))
+                append(TextUtils.truncate(command.properties.description ?: "No description available", 100))
                 append("\n")
             }
         }

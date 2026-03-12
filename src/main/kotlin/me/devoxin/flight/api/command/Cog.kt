@@ -10,6 +10,11 @@ interface Cog {
     /**
      * Invoked when an error occurs during command execution.
      * This is local to the cog, allowing for per-cog error handling.
+        *
+        * Implementations may receive typed execution failures such as
+        * [me.devoxin.flight.api.exceptions.CommandTimeoutException],
+        * [me.devoxin.flight.api.exceptions.CommandCancelledException], and
+        * [me.devoxin.flight.api.exceptions.CommandInvocationException].
      *
      * @return Whether the error was handled or not. If it wasn't,
      *         the error will be passed back to the registered
@@ -21,7 +26,11 @@ interface Cog {
      * Invoked before a command is executed. This check is local to
      * all commands inside the cog.
      *
-     * @return Whether the command execution should continue or not.
+        * Returning `false` prevents execution and surfaces a
+        * [me.devoxin.flight.api.check.CheckType.LOCAL_CHECK] failure through the
+        * centralized command failure pipeline.
+        *
+        * @return Whether the command execution should continue or not.
      */
     fun localCheck(ctx: Context, command: CommandFunction): Boolean = true
 

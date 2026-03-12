@@ -11,31 +11,21 @@ import net.dv8tion.jda.api.events.message.MessageReceivedEvent
 open class DefaultCommandEventAdapter : CommandEventAdapter {
     override fun onCheckFailed(ctx: Context, command: CommandFunction, checkType: CheckType) = Unit
 
-    override fun onBadArgument(ctx: Context, command: CommandFunction, error: BadArgument) {
-        error.printStackTrace()
-    }
+    override fun onBadArgument(ctx: Context, command: CommandFunction, error: BadArgument) = Unit
 
-    override fun onCommandError(ctx: Context, command: CommandFunction, error: Throwable) {
-        error.printStackTrace()
-    }
+    override fun onCommandError(ctx: Context, command: CommandFunction, error: Throwable) = Unit
 
     override fun onCommandPostInvoke(ctx: Context, command: CommandFunction, failed: Boolean) = Unit
 
     override fun onCommandPreInvoke(ctx: Context, command: CommandFunction) = true
 
-    override fun onParseError(ctx: Context, command: CommandFunction, error: Throwable) {
-        error.printStackTrace()
-    }
+    override fun onParseError(ctx: Context, command: CommandFunction, error: Throwable) = Unit
 
-    override fun onInternalError(error: Throwable) {
-        error.printStackTrace()
-    }
+    override fun onInternalError(error: Throwable) = Unit
 
     override fun onCommandCooldown(ctx: Context, command: CommandFunction, cooldown: Long) = Unit
 
-    override fun onAutocompleteError(event: CommandAutoCompleteInteractionEvent, error: Throwable) {
-        error.printStackTrace()
-    }
+    override fun onAutocompleteError(event: CommandAutoCompleteInteractionEvent, error: Throwable) = Unit
 
     override fun onBotMissingPermissions(ctx: Context, command: CommandFunction, permissions: List<Permission>) = Unit
 

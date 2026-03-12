@@ -1,14 +1,19 @@
 package me.devoxin.flight.api
 
-import me.devoxin.flight.api.arguments.types.Emoji
 import me.devoxin.flight.api.arguments.types.Invite
 import me.devoxin.flight.api.arguments.types.Snowflake
 import me.devoxin.flight.api.cooldown.CooldownProvider
 import me.devoxin.flight.api.cooldown.DefaultCooldownProvider
+import me.devoxin.flight.api.command.Cog
 import me.devoxin.flight.api.help.DefaultHelpCommand
 import me.devoxin.flight.api.help.DefaultHelpCommandConfig
+import me.devoxin.flight.api.execution.CommandExecutionOptions
+import me.devoxin.flight.api.error.CommandErrorHandler
+import me.devoxin.flight.api.error.StandardCommandErrorHandler
+import me.devoxin.flight.api.error.StandardCommandErrorHandlerConfig
 import me.devoxin.flight.api.hooks.CommandEventAdapter
 import me.devoxin.flight.api.hooks.DefaultCommandEventAdapter
+import me.devoxin.flight.api.localization.CommandLocalizationProvider
 import me.devoxin.flight.api.prefix.DefaultPrefixProvider
 import me.devoxin.flight.api.prefix.PrefixProvider
 import me.devoxin.flight.internal.arguments.ArgParser
@@ -16,10 +21,11 @@ import me.devoxin.flight.internal.parsers.*
 import net.dv8tion.jda.api.entities.Member
 import net.dv8tion.jda.api.entities.Role
 import net.dv8tion.jda.api.entities.User
-import net.dv8tion.jda.api.entities.channel.concrete.TextChannel
-import net.dv8tion.jda.api.entities.channel.concrete.VoiceChannel
+import net.dv8tion.jda.api.entities.emoji.CustomEmoji
+import net.dv8tion.jda.api.entities.emoji.Emoji
+import net.dv8tion.jda.api.entities.emoji.EmojiUnion
+import net.dv8tion.jda.api.entities.emoji.UnicodeEmoji
 import java.net.URL
-import java.util.concurrent.ExecutorService
 
 class CommandClientBuilder {
     private var prefixes: List<String> = emptyList()
@@ -28,8 +34,11 @@ class CommandClientBuilder {
     private var ignoreBots: Boolean = true
     private var prefixProvider: PrefixProvider? = null
     private var cooldownProvider: CooldownProvider? = null
+    private var commandLocalizationProvider: CommandLocalizationProvider? = null
+    private var executionOptions: CommandExecutionOptions = CommandExecutionOptions()
+    private var errorHandler: CommandErrorHandler? = null
     private var eventListeners: MutableList<CommandEventAdapter> = mutableListOf()
-    private var commandExecutor: ExecutorService? = null
+    private val pendingCogs: MutableList<Cog> = mutableListOf()
     private val ownerIds: MutableSet<Long> = mutableSetOf()
 
 
@@ -66,6 +75,14 @@ class CommandClientBuilder {
      */
     fun setCooldownProvider(provider: CooldownProvider): CommandClientBuilder {
         this.cooldownProvider = provider
+        return this
+    }
+
+    /**
+     * Sets the default localization provider used for application-command export and sync.
+     */
+    fun setCommandLocalizationProvider(provider: CommandLocalizationProvider?): CommandClientBuilder {
+        this.commandLocalizationProvider = provider
         return this
     }
 
@@ -134,6 +151,69 @@ class CommandClientBuilder {
     }
 
     /**
+     * Queues an already-constructed cog instance for registration during [build].
+     *
+     * This is the primary DI-friendly registration path when your cogs are created by a container,
+     * factory, or other application bootstrap logic.
+     */
+    fun register(cog: Cog): CommandClientBuilder {
+        pendingCogs += cog
+        return this
+    }
+
+    /**
+     * Queues multiple already-constructed cog instances for registration during [build].
+     */
+    fun register(vararg cogs: Cog): CommandClientBuilder {
+        pendingCogs += cogs
+        return this
+    }
+
+    /**
+     * Queues multiple already-constructed cog instances from an [Iterable] for registration during [build].
+     */
+    fun registerAll(cogs: Iterable<Cog>): CommandClientBuilder {
+        pendingCogs += cogs
+        return this
+    }
+
+    /**
+     * Replaces the execution options used for command and autocomplete handling.
+     */
+    fun setExecutionOptions(options: CommandExecutionOptions): CommandClientBuilder {
+        this.executionOptions = options
+        return this
+    }
+
+    /**
+     * Configures coroutine execution for command and autocomplete handling.
+     */
+    fun configureExecution(configure: CommandExecutionOptions.Builder.() -> Unit): CommandClientBuilder {
+        this.executionOptions = executionOptions.toBuilder()
+            .apply(configure)
+            .build()
+        return this
+    }
+
+    /**
+     * Sets the centralized error handler used for normalized command failures.
+     */
+    fun setErrorHandler(handler: CommandErrorHandler?): CommandClientBuilder {
+        this.errorHandler = handler
+        return this
+    }
+
+    /**
+     * Installs the stock centralized error handler.
+     */
+    fun useDefaultErrorHandler(
+        configure: StandardCommandErrorHandlerConfig.() -> Unit = {}
+    ): CommandClientBuilder {
+        this.errorHandler = StandardCommandErrorHandler(StandardCommandErrorHandlerConfig().apply(configure))
+        return this
+    }
+
+    /**
      * Registers an argument parser to the given class.
      *
      * @return The builder instance. Useful for chaining.
@@ -184,29 +264,18 @@ class CommandClientBuilder {
 
         ArgParser.parsers[Member::class.java] = MemberParser()
         ArgParser.parsers[Role::class.java] = RoleParser()
-        ArgParser.parsers[TextChannel::class.java] = TextChannelParser()
         ArgParser.parsers[User::class.java] = UserParser()
-        ArgParser.parsers[VoiceChannel::class.java] = VoiceChannelParser()
+        GuildChannelParsers.registerDefaults(ArgParser.parsers)
 
         // Custom entities
-        ArgParser.parsers[Emoji::class.java] = EmojiParser()
+        ArgParser.parsers[Emoji::class.java] = EmojiParser.forEmoji()
+        ArgParser.parsers[EmojiUnion::class.java] = EmojiParser.forEmojiUnion()
+        ArgParser.parsers[UnicodeEmoji::class.java] = EmojiParser.forUnicodeEmoji()
+        ArgParser.parsers[CustomEmoji::class.java] = EmojiParser.forCustomEmoji()
         ArgParser.parsers[String::class.java] = StringParser()
         ArgParser.parsers[Snowflake::class.java] = SnowflakeParser()
         ArgParser.parsers[URL::class.java] = UrlParser()
 
-        return this
-    }
-
-    /**
-     * Sets the thread pool used for executing commands.
-     *
-     * @param executorPool
-     *        The pool to use. If null is given, commands will be executed on the WebSocket thread.
-     *
-     * @return The builder instance, useful for chaining.
-     */
-    fun setExecutionThreadPool(executorPool: ExecutorService?): CommandClientBuilder {
-        this.commandExecutor = executorPool
         return this
     }
 
@@ -224,7 +293,7 @@ class CommandClientBuilder {
         val cooldownProvider = this.cooldownProvider ?: DefaultCooldownProvider()
         val commandClient = CommandClient(
             prefixProvider, cooldownProvider, ignoreBots, eventListeners.toList(),
-            commandExecutor, ownerIds
+            executionOptions, ownerIds, commandLocalizationProvider, errorHandler
         )
 
         if (helpCommandConfig.enabled) {
@@ -235,6 +304,8 @@ class CommandClientBuilder {
                 )
             )
         }
+
+        commandClient.commands.registerAll(pendingCogs)
 
         return commandClient
     }

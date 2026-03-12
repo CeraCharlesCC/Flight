@@ -10,6 +10,7 @@ import net.dv8tion.jda.api.entities.User
 import net.dv8tion.jda.api.entities.channel.middleman.GuildMessageChannel
 import net.dv8tion.jda.api.entities.channel.middleman.MessageChannel
 import net.dv8tion.jda.api.events.Event
+import net.dv8tion.jda.api.interactions.DiscordLocale
 import net.dv8tion.jda.api.utils.FileUpload
 import net.dv8tion.jda.api.utils.messages.MessageCreateData
 import java.util.concurrent.CompletableFuture
@@ -32,6 +33,27 @@ interface Context {
     val asSlashContext: SlashContext?
         get() = this as? SlashContext
 
+    /**
+     * The current Context instance as an InteractionContext instance,
+     * if it originates from an interaction, otherwise null.
+     */
+    val asInteractionContext: InteractionContext?
+        get() = this as? InteractionContext
+
+    /**
+     * The current Context instance as a UserCommandContext instance,
+     * if contextType is [ContextType.USER_COMMAND], otherwise null.
+     */
+    val asUserCommandContext: UserCommandContext?
+        get() = this as? UserCommandContext
+
+    /**
+     * The current Context instance as a MessageCommandContext instance,
+     * if contextType is [ContextType.MESSAGE_COMMAND], otherwise null.
+     */
+    val asMessageCommandContext: MessageCommandContext?
+        get() = this as? MessageCommandContext
+
     val commandClient: CommandClient
     val jda: JDA
     val author: User
@@ -40,58 +62,62 @@ interface Context {
     val messageChannel: MessageChannel
     val guildChannel: GuildMessageChannel?
     val isFromGuild: Boolean
+    val locale: DiscordLocale?
+        get() = asInteractionContext?.locale
+    val guildLocale: DiscordLocale?
+        get() = asInteractionContext?.guildLocale
 
     /**
-     * Sends "Bot is thinking..." for slash commands, or a typing indicator for message commands.
+     * Sends an interaction defer response for application commands, or a typing indicator for message commands.
      *
      * @param ephemeral
      *        Whether the response should only be seen by the invoking user.
-     *        This only applies to slash commands.
+     *        This only applies to interaction-based commands.
      */
     fun think(ephemeral: Boolean = false): CompletableFuture<*> {
-        return asSlashContext?.defer0(ephemeral)
+        return asInteractionContext?.defer(ephemeral)
             ?: messageChannel.sendTyping().submit()
     }
 
     /**
-     * Convenience method for replying to either a slash command event, or a message event.
-     * This will acknowledge, and correctly respond to slash command events, if applicable.
+     * Convenience method for replying to either an application-command interaction or a message event.
+     * This will acknowledge, and correctly respond to interaction command events, if applicable.
      *
      * @param content
      *        The response content to send.
      */
     fun respond(content: String): CompletableFuture<*> {
-        return asSlashContext?.respond0(MessageCreateData.fromContent(content))
+        return asInteractionContext?.respond(content, ephemeral = false)
             ?: messageChannel.sendMessage(content).submit()
     }
 
     /**
-     * Convenience method for replying to either a slash command event, or a message event.
-     * This will acknowledge, and correctly respond to slash command events, if applicable.
+     * Convenience method for replying to either an application-command interaction or a message event.
+     * This will acknowledge, and correctly respond to interaction command events, if applicable.
      *
      * @param file
      *        The file to send.
      */
     fun respond(file: FileUpload): CompletableFuture<*> {
-        return asSlashContext?.respond0(MessageCreateData.fromFiles(file))
+        return asInteractionContext?.respond(MessageCreateData.fromFiles(file), ephemeral = false)
             ?: messageChannel.sendFiles(file).submit()
     }
 
     /**
-     * Convenience method for replying to either a slash command event, or a message event.
-     * This will acknowledge, and correctly respond to slash command events, if applicable.
+     * Convenience method for replying to either an application-command interaction or a message event.
+     * This will acknowledge, and correctly respond to interaction command events, if applicable.
      *
      * @param message
      *        The message data to send.
      */
     fun respond(message: MessageCreateData): CompletableFuture<*> {
-        return asSlashContext?.respond0(message)
+        return asInteractionContext?.respond(message, ephemeral = false)
             ?: messageChannel.sendMessage(message).submit()
     }
 
     /**
-     * Convenience method for replying to either a slash command event, or a message event.
-     * This will acknowledge, and correctly respond to slash command events, if applicable.
+     * Convenience method for replying to either an application-command interaction or a message event.
+     * This will acknowledge, and correctly respond to interaction command events, if applicable.
      *
      * @param messageBuilder
      *        The options to apply when creating a response.
@@ -99,13 +125,13 @@ interface Context {
     fun respond(messageBuilder: DSLMessageCreateBuilder.() -> Unit): CompletableFuture<*> {
         val built = DSLMessageCreateBuilder().apply(messageBuilder).build()
 
-        return asSlashContext?.respond0(built)
+        return asInteractionContext?.respond(built, ephemeral = false)
             ?: messageChannel.sendMessage(built).submit()
     }
 
     /**
      * Sends a message to the channel. This has no special handling, and could cause
-     * problems with slash command events, so use with caution.
+        * problems with interaction command events, so use with caution.
      *
      * @param content
      *        The response content to send.

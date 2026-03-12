@@ -63,6 +63,11 @@ interface CommandEventAdapter {
 
     /**
      * Invoked when a command encounters an error during execution.
+        *
+        * Implementations may receive typed execution failures such as
+        * [me.devoxin.flight.api.exceptions.CommandTimeoutException],
+        * [me.devoxin.flight.api.exceptions.CommandCancelledException], and
+        * [me.devoxin.flight.api.exceptions.CommandInvocationException].
      */
     fun onCommandError(ctx: Context, command: CommandFunction, error: Throwable)
 
@@ -80,6 +85,11 @@ interface CommandEventAdapter {
 
     /**
      * Invoked when an autocomplete handler encounters an error during execution.
+        *
+        * Implementations may receive typed execution failures such as
+        * [me.devoxin.flight.api.exceptions.AutocompleteTimeoutException],
+        * [me.devoxin.flight.api.exceptions.AutocompleteCancelledException], and
+        * [me.devoxin.flight.api.exceptions.AutocompleteInvocationException].
      */
     fun onAutocompleteError(event: CommandAutoCompleteInteractionEvent, error: Throwable)
 

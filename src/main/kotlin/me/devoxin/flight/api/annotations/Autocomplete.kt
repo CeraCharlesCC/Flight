@@ -1,14 +1,11 @@
 package me.devoxin.flight.api.annotations
 
+import me.devoxin.flight.api.autocomplete.AutocompleteHandler
+import kotlin.reflect.KClass
+
 @Retention(AnnotationRetention.RUNTIME)
 @Target(AnnotationTarget.VALUE_PARAMETER)
 annotation class Autocomplete(
-    /**
-     * AUTOCOMPLETE HANDLERS MUST HAVE THE PARAMETER:
-     * event: CommandAutoCompleteInteractionEvent
-     */
-
-    // The name of the method (in the same cog) that will handle autocomplete requests
-    // for this parameter.
-    val method: String
+    /** The typed autocomplete handler for this parameter. */
+    val value: KClass<out AutocompleteHandler<*>>
 )
