@@ -2,13 +2,16 @@ package me.devoxin.flight.api
 
 import me.devoxin.flight.api.annotations.Command
 import me.devoxin.flight.api.command.Cog
+import me.devoxin.flight.api.check.CheckType
 import me.devoxin.flight.api.context.Context
 import me.devoxin.flight.api.context.ContextType
 import me.devoxin.flight.api.error.CommandFailure
 import me.devoxin.flight.api.error.StandardCommandErrorHandler
+import me.devoxin.flight.api.error.StandardCommandErrorHandlerConfig
 import me.devoxin.flight.api.exceptions.BadArgument
 import me.devoxin.flight.internal.entities.Executable
 import net.dv8tion.jda.api.JDA
+import net.dv8tion.jda.api.Permission
 import net.dv8tion.jda.api.entities.Guild
 import net.dv8tion.jda.api.entities.Member
 import net.dv8tion.jda.api.entities.User
@@ -19,6 +22,7 @@ import java.lang.reflect.Proxy
 import java.util.concurrent.CompletableFuture
 import kotlin.test.Test
 import kotlin.test.assertContentEquals
+import kotlin.test.assertEquals
 
 class StandardCommandErrorHandlerTest {
     @Test
@@ -49,6 +53,98 @@ class StandardCommandErrorHandlerTest {
         )
 
         context.commandClient.shutdown()
+    }
+
+    @Test
+    fun `custom sender receives formatted messages for every contextual failure`() {
+        val client = CommandClient.builder().register(StandardHandlerCog()).build()
+        try {
+            val command = client.commands.findMessageCommand("standard")!!
+            val context = RecordingContext(client, command)
+            val sent = mutableListOf<Pair<Context, String>>()
+            val config = StandardCommandErrorHandlerConfig().apply {
+                badArgumentMessage = { "argument" }
+                checkFailureMessage = { "check" }
+                cooldownMessage = { "cooldown" }
+                missingUserPermissionsMessage = { "user permissions" }
+                missingBotPermissionsMessage = { "bot permissions" }
+                parseFailureMessage = { "parse" }
+                commandExecutionMessage = { "execution" }
+                responseSender = { responseContext, message ->
+                    sent += responseContext to message
+                    CompletableFuture.completedFuture(Unit)
+                }
+            }
+            val handler = StandardCommandErrorHandler(config)
+            val error = IllegalStateException("boom")
+            listOf(
+                CommandFailure.BadArgumentFailure(context, command, BadArgument(command.arguments.single(), "bad")),
+                CommandFailure.CheckFailure(context, command, CheckType.LOCAL_CHECK),
+                CommandFailure.CooldownFailure(context, command, 1500),
+                CommandFailure.MissingUserPermissionsFailure(context, command, listOf(Permission.MESSAGE_MANAGE)),
+                CommandFailure.MissingBotPermissionsFailure(context, command, listOf(Permission.MESSAGE_SEND)),
+                CommandFailure.ParseFailure(context, command, error),
+                CommandFailure.CommandExecutionFailure(context, command, error)
+            ).forEach(handler::handle)
+
+            assertContentEquals(
+                listOf("argument", "check", "cooldown", "user permissions", "bot permissions", "parse", "execution")
+                    .map { context to it },
+                sent
+            )
+            assertEquals(emptyList(), context.responses)
+
+            config.checkFailureMessage = { null }
+            handler.handle(CommandFailure.CheckFailure(context, command, CheckType.LOCAL_CHECK))
+            handler.handle(CommandFailure.FrameworkFailure(error))
+            assertEquals(7, sent.size)
+        } finally {
+            client.shutdown()
+        }
+    }
+
+    @Test
+    fun `ephemeral setting preserves message context responses`() {
+        val client = CommandClient.builder().register(StandardHandlerCog()).build()
+        try {
+            val command = client.commands.findMessageCommand("standard")!!
+            val context = RecordingContext(client, command)
+            val handler = StandardCommandErrorHandler(StandardCommandErrorHandlerConfig().apply {
+                ephemeralResponses = true
+            })
+
+            handler.handle(CommandFailure.CooldownFailure(context, command, 1500))
+
+            assertContentEquals(listOf("That command is on cooldown. Try again in 2s."), context.responses)
+        } finally {
+            client.shutdown()
+        }
+    }
+
+    @Test
+    fun `sender failures do not escape error handling or prevent later responses`() {
+        val client = CommandClient.builder().register(StandardHandlerCog()).build()
+        try {
+            val command = client.commands.findMessageCommand("standard")!!
+            val context = RecordingContext(client, command)
+            var attempts = 0
+            val handler = StandardCommandErrorHandler(StandardCommandErrorHandlerConfig().apply {
+                responseSender = { _, _ ->
+                    when (++attempts) {
+                        1 -> throw IllegalStateException("synchronous send failure")
+                        2 -> CompletableFuture.failedFuture<Unit>(IllegalStateException("asynchronous send failure"))
+                        else -> CompletableFuture.completedFuture(Unit)
+                    }
+                }
+            })
+
+            repeat(3) {
+                handler.handle(CommandFailure.CooldownFailure(context, command, 1500))
+            }
+            assertEquals(3, attempts)
+        } finally {
+            client.shutdown()
+        }
     }
 }
 

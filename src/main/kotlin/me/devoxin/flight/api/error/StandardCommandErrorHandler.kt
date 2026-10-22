@@ -50,7 +50,11 @@ class StandardCommandErrorHandler(
     }
 
     private fun respond(context: Context, message: String) {
-        dispatch(context.respond(message), "respond to command failure")
+        try {
+            dispatch(config.responseSender(context, message), "respond to command failure")
+        } catch (exception: Exception) {
+            log.warn("Failed to respond to command failure", exception)
+        }
     }
 
     private fun dispatch(future: CompletableFuture<*>, action: String) {

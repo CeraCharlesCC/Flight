@@ -294,6 +294,59 @@ The standard handler:
 - logs framework/autocomplete failures without trying to message a user
 - keeps unknown-command replies disabled by default to avoid noisy bots
 
+### Private interaction errors
+
+Request ephemeral error responses without wrapping the standard handler:
+
+```kotlin
+val client = CommandClient.builder()
+  .useDefaultErrorHandler {
+    ephemeralResponses = true
+  }
+  .build()
+```
+
+This applies to slash commands and context menus. Prefix-command errors still use
+the message channel. Initial interaction replies and follow-up errors request the
+configured visibility. When the original response is edited after deferral, it
+keeps the visibility chosen by `defer` / `deferAsync`; `ephemeralResponses` cannot
+make a public deferred response private. Defer privately when the original error
+response must remain private.
+
+### Custom response rendering
+
+Keep Flight's failure routing, message formatters, and logging while replacing
+only the delivery step. For example, an application can render errors with
+Components V2:
+
+```kotlin
+val client = CommandClient.builder()
+  .useDefaultErrorHandler {
+    cooldownMessage = { failure ->
+      val language = failure.context.locale?.toLocale()?.language
+      if (language == "ja") "しばらく待ってから再試行してください。"
+      else "Please wait before trying again."
+    }
+    responseSender = { context, message ->
+      context.respond {
+        useComponentsV2(true)
+        setComponents(listOf(net.dv8tion.jda.api.components.textdisplay.TextDisplay.of(message)))
+      }
+    }
+  }
+  .build()
+```
+
+`responseSender` receives the context and the formatted message for argument,
+check, cooldown, permission, parse, and execution failures. Return the send future
+so Flight can log asynchronous failures; synchronous send exceptions are logged
+as well. A custom sender controls its own visibility and does not automatically
+apply `ephemeralResponses`. Return `null` from `checkFailureMessage` to suppress
+that check response entirely.
+
+Unknown-command responses keep their separate opt-in message-channel path.
+Framework and autocomplete failures remain log-only.
+
 ### Custom centralized handler
 
 ```kotlin
@@ -391,4 +444,3 @@ If you are updating older Flight usage, the biggest changes are:
 
 7. **Default adapter behavior is intentionally quiet**
    - install your own centralized handler or the standard handler for user-facing responses
-   

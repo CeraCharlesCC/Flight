@@ -6,6 +6,9 @@ import me.devoxin.flight.api.context.Context
 import me.devoxin.flight.api.context.InteractionContext
 import me.devoxin.flight.api.context.MessageContext
 import me.devoxin.flight.api.context.SlashContext
+import me.devoxin.flight.api.error.CommandFailure
+import me.devoxin.flight.api.error.StandardCommandErrorHandler
+import me.devoxin.flight.api.error.StandardCommandErrorHandlerConfig
 import net.dv8tion.jda.api.JDA
 import net.dv8tion.jda.api.entities.Message
 import net.dv8tion.jda.api.entities.User
@@ -17,6 +20,7 @@ import net.dv8tion.jda.api.events.message.MessageReceivedEvent
 import net.dv8tion.jda.api.components.actionrow.ActionRow
 import net.dv8tion.jda.api.components.buttons.Button
 import net.dv8tion.jda.api.components.label.Label
+import net.dv8tion.jda.api.components.textdisplay.TextDisplay
 import net.dv8tion.jda.api.components.textinput.TextInput
 import net.dv8tion.jda.api.components.textinput.TextInputStyle
 import net.dv8tion.jda.api.interactions.DiscordLocale
@@ -41,6 +45,81 @@ import kotlin.test.assertFailsWith
 import kotlin.test.assertNull
 
 class InteractionContextResponseTest {
+    @Test
+    fun `standard errors respect configured visibility for initial replies and followups`() {
+        for (ephemeral in listOf(false, true)) {
+            val recorder = InteractionRecorder()
+            val ctx = slashContext(recorder)
+            try {
+                val handler = StandardCommandErrorHandler(StandardCommandErrorHandlerConfig().apply {
+                    ephemeralResponses = ephemeral
+                })
+                val failure = CommandFailure.CooldownFailure(ctx, ctx.invokedCommand as CommandFunction, 1500)
+
+                handler.handle(failure)
+                handler.handle(failure)
+
+                assertEquals(1, recorder.replyCalls)
+                assertEquals(ephemeral, recorder.lastReplyEphemeral)
+                assertEquals(1, recorder.followupCalls)
+                assertEquals(ephemeral, recorder.lastFollowupEphemeral)
+                assertEquals("That command is on cooldown. Try again in 2s.", recorder.lastReplyMessage?.content)
+            } finally {
+                ctx.commandClient.shutdown()
+            }
+        }
+    }
+
+    @Test
+    fun `ephemeral errors after deferral edit the original without a second acknowledgement`() {
+        for (deferredEphemeral in listOf(false, true)) {
+            val recorder = InteractionRecorder()
+            val ctx = slashContext(recorder)
+            try {
+                ctx.defer(ephemeral = deferredEphemeral).join()
+                val handler = StandardCommandErrorHandler(StandardCommandErrorHandlerConfig().apply {
+                    ephemeralResponses = true
+                })
+
+                handler.handle(CommandFailure.CooldownFailure(ctx, ctx.invokedCommand as CommandFunction, 1500))
+
+                assertEquals(deferredEphemeral, recorder.lastDeferredEphemeral)
+                assertEquals(1, recorder.deferCalls)
+                assertEquals(1, recorder.editOriginalCalls)
+                assertEquals(0, recorder.replyCalls)
+                assertEquals(0, recorder.followupCalls)
+            } finally {
+                ctx.commandClient.shutdown()
+            }
+        }
+    }
+
+    @Test
+    fun `custom error sender can render components v2 and localize from context`() {
+        val recorder = InteractionRecorder()
+        val ctx = slashContext(recorder, locale = DiscordLocale.JAPANESE)
+        try {
+            val handler = StandardCommandErrorHandler(StandardCommandErrorHandlerConfig().apply {
+                cooldownMessage = { failure -> "${failure.context.locale}: ${failure.cooldownMillis}" }
+                responseSender = { context, message ->
+                    context.asInteractionContext!!.respond({
+                        useComponentsV2(true)
+                        setComponents(listOf(TextDisplay.of(message)))
+                    }, ephemeral = true)
+                }
+            })
+
+            handler.handle(CommandFailure.CooldownFailure(ctx, ctx.invokedCommand as CommandFunction, 1500))
+
+            val sent = recorder.lastReplyMessage!!
+            assertEquals(true, sent.isUsingComponentsV2)
+            assertEquals("${DiscordLocale.JAPANESE}: 1500", sent.components.single().asTextDisplay().content)
+            assertEquals(true, recorder.lastReplyEphemeral)
+        } finally {
+            ctx.commandClient.shutdown()
+        }
+    }
+
     @Test
     fun `interaction context exposes locale and guildLocale and generic Context delegates them`() {
         val ctx = slashContext(
@@ -343,8 +422,7 @@ private fun slashEvent(
             }
 
             "deferReply" -> {
-                val ephemeral = args?.firstOrNull() as? Boolean ?: false
-                replyCallbackAction({ recorder.consumeNextDeferFailure() }) { _ ->
+                replyCallbackAction({ recorder.consumeNextDeferFailure() }) { ephemeral ->
                     recorder.acknowledged = true
                     recorder.deferCalls += 1
                     recorder.lastDeferredEphemeral = ephemeral
@@ -364,7 +442,9 @@ private fun slashEvent(
         }
     }
 
-    return SlashCommandInteractionEvent(jda, 0L, interaction)
+    return object : SlashCommandInteractionEvent(jda, 0L, interaction) {
+        override fun reply(message: MessageCreateData): ReplyCallbackAction = interaction.reply(message)
+    }
 }
 
 private fun interactionHook(recorder: InteractionRecorder): InteractionHook {

@@ -1,9 +1,33 @@
 package me.devoxin.flight.api.error
 
 import me.devoxin.flight.api.check.CheckType
+import me.devoxin.flight.api.context.Context
+import java.util.concurrent.CompletableFuture
 
 class StandardCommandErrorHandlerConfig {
     var enableUnknownCommandResponses: Boolean = false
+
+    /**
+     * Requests private interaction error responses. Message commands are unaffected.
+     * An original response edited after deferral retains the deferral's visibility.
+     * Only applies to the default [responseSender].
+     */
+    var ephemeralResponses: Boolean = false
+
+    /**
+     * Sends errors that have a [Context], after the configured message formatter has run.
+     * Replace this to render embeds or components without reimplementing failure handling.
+     * The handler observes the returned future and logs send failures.
+     * Unknown-command, framework, and autocomplete failures do not use this sender.
+     */
+    var responseSender: (Context, String) -> CompletableFuture<*> = { context, message ->
+        val interaction = context.asInteractionContext
+        if (ephemeralResponses && interaction != null) {
+            interaction.respond(message, ephemeral = true)
+        } else {
+            context.respond(message)
+        }
+    }
 
     var badArgumentMessage: (CommandFailure.BadArgumentFailure) -> String = { failure ->
         failure.error.message ?: "One of the provided arguments is invalid."

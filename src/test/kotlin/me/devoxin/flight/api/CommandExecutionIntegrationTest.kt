@@ -185,7 +185,7 @@ class CommandExecutionIntegrationTest {
 
         client.commands.register(cog)
 
-        val callerThreadId = Thread.currentThread().threadId()
+        val callerThreadId = Thread.currentThread().id
         client.onEvent(messageReceivedEvent("!blocking", userProxy(1L)))
 
         assertTrue(cog.invoked.await(3, TimeUnit.SECONDS))
@@ -212,7 +212,7 @@ class CommandExecutionIntegrationTest {
 
         client.commands.register(cog)
 
-        val callerThreadId = Thread.currentThread().threadId()
+        val callerThreadId = Thread.currentThread().id
         client.onEvent(messageReceivedEvent("!inline", userProxy(2L)))
 
         assertEquals(callerThreadId, cog.executingThreadId)
@@ -598,7 +598,7 @@ class BlockingDispatchCog : Cog {
 
     @Command
     fun blocking(ctx: MessageContext) {
-        executingThreadId = Thread.currentThread().threadId()
+        executingThreadId = Thread.currentThread().id
         invoked.countDown()
     }
 }
@@ -611,7 +611,7 @@ class InlineBlockingCog(
 
     @Command
     fun inline(ctx: MessageContext) {
-        executingThreadId = Thread.currentThread().threadId()
+        executingThreadId = Thread.currentThread().id
         Thread.sleep(sleepMillis)
     }
 }
