@@ -2,4 +2,4 @@ jdk:
   - openjdk17
 
 install:
-  - ./gradlew clean build publishToMavenLocal -Pversion="$VERSION"
+  - ./gradlew clean build publishToMavenLocal && python3 scripts/verify-publication.py

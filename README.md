@@ -2,13 +2,15 @@
 
 [![Release](https://jitpack.io/v/CeraCharlesCC/Flight.svg)](https://jitpack.io/#CeraCharlesCC/Flight)
 
+Release target: **5.1.10**. See [build and release instructions](docs/new-feature-and-migration.md#building-and-release-versions).
+
 Flight is a Kotlin command framework for JDA 6. It supports slash commands, context menus, optional message commands, typed argument parsers, and explicit command registration and synchronization.
 
 Requires Java 17+, Kotlin/JVM targeting Java 17, JDA 6, and JDA's `AnnotatedEventManager`. The examples describe the current source tree; use a release containing the APIs you need. See the [feature and migration guide](docs/new-feature-and-migration.md) for the full API walkthrough.
 
 ## Installation
 
-Choose one publication source. Replace `VERSION` with a published release tag or package version. Add JDA separately because Flight declares it as a compile-only dependency.
+These examples target **5.1.10**. The release tag and the package on your chosen registry must be published before these coordinates resolve. Add JDA separately because Flight declares it as a compile-only dependency.
 
 ### JitPack (public, no token required)
 
@@ -21,12 +23,12 @@ repositories {
 }
 
 dependencies {
-  implementation("com.github.CeraCharlesCC:Flight:VERSION")
+  implementation("com.github.CeraCharlesCC:Flight:5.1.10")
   implementation("net.dv8tion:JDA:6.1.2")
 }
 ```
 
-Use the exact owner/repository casing shown above. JitPack maps this single-module project to `com.github.CeraCharlesCC:Flight`, even though the Gradle publication uses `flight-jda6`. These coordinates are confirmed by the [5.1.1 POM](https://jitpack.io/com/github/CeraCharlesCC/Flight/5.1.1/Flight-5.1.1.pom) and [module metadata](https://jitpack.io/com/github/CeraCharlesCC/Flight/5.1.1/Flight-5.1.1.module). See JitPack's [single-module coordinate rules](https://docs.jitpack.io/building/#multi-module-projects).
+Use the exact owner/repository casing shown above. JitPack maps this single-module project to `com.github.CeraCharlesCC:Flight`, while GitHub Packages uses `io.github.ceracharlescc:flight-jda6`. See JitPack's [single-module coordinate rules](https://docs.jitpack.io/building/#multi-module-projects).
 
 ### GitHub Packages
 
@@ -45,7 +47,7 @@ repositories {
 }
 
 dependencies {
-  implementation("io.github.ceracharlescc:flight-jda6:VERSION")
+  implementation("io.github.ceracharlescc:flight-jda6:5.1.10")
   implementation("net.dv8tion:JDA:6.1.2")
 }
 ```

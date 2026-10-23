@@ -23,4 +23,19 @@ jobs:
         uses: gradle/actions/setup-gradle@af1da67850ed9a4cedd57bfd976089dd991e2582 # v4.0.0
 
       - name: Build, test, and validate local Maven publication
-        run: ./gradlew build publishToMavenLocal -Dmaven.repo.local="$RUNNER_TEMP/flight-m2"
+        run: |
+          if [[ "$GITHUB_REF_TYPE" == tag ]]; then
+            export RELEASE_TAG="$GITHUB_REF_NAME"
+          fi
+          ./gradlew build publishToMavenLocal -Dmaven.repo.local="$RUNNER_TEMP/flight-m2"
+
+      - name: Verify publication metadata and JARs
+        run: python3 scripts/verify-publication.py --repository "$RUNNER_TEMP/flight-m2"
+
+      - name: Validate JitPack publication
+        env:
+          JITPACK: 'true'
+        run: |
+          export VERSION="$(sed -n 's/^version=//p' gradle.properties)"
+          ./gradlew clean build publishToMavenLocal -Dmaven.repo.local="$RUNNER_TEMP/flight-jitpack-m2"
+          python3 scripts/verify-publication.py --repository "$RUNNER_TEMP/flight-jitpack-m2"

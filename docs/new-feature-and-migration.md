@@ -20,7 +20,7 @@ This guide describes the current source tree. Use a release containing the APIs 
 
 ## Installation
 
-Choose one publication source. Replace `VERSION` with a published release tag or package version. Add JDA separately because Flight declares it as a compile-only dependency.
+These examples target **5.1.10**. The release tag and the package on your chosen registry must be published before these coordinates resolve. Add JDA separately because Flight declares it as a compile-only dependency.
 
 ### JitPack (public, no token required)
 
@@ -33,12 +33,12 @@ repositories {
 }
 
 dependencies {
-  implementation("com.github.CeraCharlesCC:Flight:VERSION")
+  implementation("com.github.CeraCharlesCC:Flight:5.1.10")
   implementation("net.dv8tion:JDA:6.1.2")
 }
 ```
 
-Use the exact owner/repository casing shown above. JitPack maps this single-module project to `com.github.CeraCharlesCC:Flight`, even though the Gradle publication uses `flight-jda6`. These coordinates are confirmed by the [5.1.1 POM](https://jitpack.io/com/github/CeraCharlesCC/Flight/5.1.1/Flight-5.1.1.pom) and [module metadata](https://jitpack.io/com/github/CeraCharlesCC/Flight/5.1.1/Flight-5.1.1.module). See JitPack's [single-module coordinate rules](https://docs.jitpack.io/building/#multi-module-projects).
+Use the exact owner/repository casing shown above. JitPack maps this single-module project to `com.github.CeraCharlesCC:Flight`, while GitHub Packages uses `io.github.ceracharlescc:flight-jda6`. See JitPack's [single-module coordinate rules](https://docs.jitpack.io/building/#multi-module-projects).
 
 ### GitHub Packages
 
@@ -57,7 +57,7 @@ repositories {
 }
 
 dependencies {
-  implementation("io.github.ceracharlescc:flight-jda6:VERSION")
+  implementation("io.github.ceracharlescc:flight-jda6:5.1.10")
   implementation("net.dv8tion:JDA:6.1.2")
 }
 ```
@@ -493,12 +493,27 @@ If you are updating older Flight usage, the biggest changes are:
 
 ## Building and release versions
 
-Run `./gradlew clean build` to compile and run the tests. Push and pull-request CI runs the build and validates local Maven publication; JitPack also runs the build before publishing to its local Maven repository.
+`gradle.properties` is the release version authority and currently specifies **5.1.10**. Release tags use that exact value, without a leading `v`. The build rejects a different release tag instead of silently overriding an outdated version.
 
-The GitHub Packages workflow runs when a release is published. Its numeric tag supplies the Maven version, with an optional leading `v` removed (`5.1.1` and `v5.1.1` both publish `5.1.1`). JitPack uses its exact requested tag or commit as `VERSION`. Both paths override Gradle's version with `-Pversion=...`, including the embedded Flight version. The value in `gradle.properties` remains the fallback for ordinary local builds.
+Run `./gradlew clean build` to compile and run the tests. CI validates both GitHub Packages and JitPack publication modes, and tag pushes also check the tag against `gradle.properties`. `flight.txt` is generated under `build/`, and both binary and sources JARs embed the effective version and Git revision. Old generated files in `src/main/resources` are ignored.
+
+The GitHub Packages workflow runs when a GitHub release is published. It checks out the release tag and checks that `RELEASE_TAG` matches `gradle.properties`. It builds, tests, publishes locally, verifies POM/module metadata and JAR contents, then uploads the same publication. A tag push alone does not publish GitHub Packages. The workflow also supports manual dispatch with an existing tag to retry publication.
+
+JitPack supplies `JITPACK=true` and `VERSION`. Numeric release tags must match `gradle.properties` exactly. Commit and branch snapshot builds use their exact requested `VERSION`, including in `FlightInfo.VERSION`. JitPack publishes the ordinary library JAR, its sources, and a POM; Gradle module metadata is disabled there to avoid corrupted classifier URLs. The standalone `shadowJar` task remains available, but its variant is excluded from Maven publication.
 
 To inspect the Maven publication locally without uploading it:
 
 ```sh
-./gradlew build publishToMavenLocal -Pversion=5.1.1
+./gradlew clean build publishToMavenLocal -Dmaven.repo.local=/tmp/flight-m2
+python3 scripts/verify-publication.py --repository /tmp/flight-m2
 ```
+
+To reproduce JitPack's release build locally (Python 3 is required for verification):
+
+```sh
+export JITPACK=true VERSION=5.1.10
+./gradlew clean build publishToMavenLocal -Dmaven.repo.local=/tmp/flight-jitpack-m2
+python3 scripts/verify-publication.py --repository /tmp/flight-jitpack-m2
+```
+
+For a release, commit the version and publication changes first, create and push tag `5.1.10` at that commit, and publish the GitHub release for that tag. Check that **Publish GitHub Package** succeeds. Request `com.github.CeraCharlesCC:Flight:5.1.10` from JitPack to trigger its separate build and check its build log. Do not move old tags to repair existing artifacts: use a new version. Historical 5.1.1 artifacts were built with the old 5.1.0 source version and are not repaired by these changes.
