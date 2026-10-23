@@ -157,7 +157,9 @@ class CommandClient(
             ) { it.onParseError(ctx, cmd, e) }
         }
 
-        setCooldown(cmd, ctx)
+        if (!tryAcquireCooldown(cmd, ctx)) {
+            return
+        }
         executionCoordinator.executeCommand(invoked, ctx, arguments, createCompletionCallback(ctx, cmd))
     }
 
@@ -209,7 +211,9 @@ class CommandClient(
 
         val arguments = resolveArguments()
 
-        setCooldown(command, ctx)
+        if (!tryAcquireCooldown(command, ctx)) {
+            return
+        }
         executionCoordinator.executeCommand(invoked, ctx, arguments, createCompletionCallback(ctx, command))
     }
 
@@ -294,28 +298,31 @@ class CommandClient(
     }
 
     private fun onGenericEvent(event: GenericEvent) {
-        val key = event::class.java
-        val matched = mutableListOf<WaitingEvent<*>>()
-
-        pendingEvents.computeIfPresent(key) { _, events ->
-            events.removeIf { waiter ->
-                if (waiter.check(event)) {
-                    matched += waiter
-                    true
-                } else {
-                    false
-                }
-            }
-
-            if (events.isEmpty()) null else events
-        }
-
-        if (matched.isEmpty()) {
+        if (event !is Event) {
             return
         }
 
-        val jdaEvent = event as Event
-        matched.forEach { it.accept(jdaEvent) }
+        val matched = mutableListOf<WaitingEvent<*>>()
+        var eventType: Class<*>? = event::class.java
+
+        while (eventType != null && Event::class.java.isAssignableFrom(eventType)) {
+            pendingEvents.computeIfPresent(eventType) { _, events ->
+                events.removeIf { waiter ->
+                    if (waiter.check(event)) {
+                        matched += waiter
+                        true
+                    } else {
+                        false
+                    }
+                }
+
+                if (events.isEmpty()) null else events
+            }
+
+            eventType = eventType.superclass
+        }
+
+        matched.forEach { it.accept(event) }
     }
 
     inline fun <reified T : Event> waitFor(
@@ -325,6 +332,11 @@ class CommandClient(
         return waitFor(T::class.java, predicate, timeout)
     }
 
+    /**
+     * Completes once for an [event] or any subclass that passes [predicate].
+     * A positive [timeout] is measured in milliseconds; otherwise the waiter has no timeout.
+     * An expired waiter completes exceptionally with [TimeoutException].
+     */
     fun <T : Event> waitFor(
         event: Class<T>,
         predicate: (T) -> Boolean,
@@ -333,10 +345,9 @@ class CommandClient(
         val future = CompletableFuture<T>()
         val we = WaitingEvent(event, predicate, future)
 
-        val set = pendingEvents.computeIfAbsent(event) {
-            ConcurrentHashMap.newKeySet<WaitingEvent<*>>()
+        pendingEvents.compute(event) { _, existing ->
+            (existing ?: ConcurrentHashMap.newKeySet<WaitingEvent<*>>()).apply { add(we) }
         }
-        set.add(we)
 
         if (timeout > 0) {
             waiterScheduler.schedule({
@@ -537,19 +548,28 @@ class CommandClient(
         return false
     }
 
-    private fun setCooldown(cmd: CommandFunction, ctx: Context) {
-        if (cmd.cooldown != null && cmd.cooldown.duration > 0) {
-            val entityId = when (cmd.cooldown.bucket) {
-                BucketType.USER -> ctx.author.idLong
-                BucketType.GUILD -> ctx.guild?.idLong
-                BucketType.GLOBAL -> -1
-            }
-
-            if (entityId != null) {
-                val time = cmd.cooldown.timeUnit.toMillis(cmd.cooldown.duration)
-                cooldownProvider.setCooldown(entityId, cmd.cooldown.bucket, time, cmd)
-            }
+    private fun tryAcquireCooldown(cmd: CommandFunction, ctx: Context): Boolean {
+        val cooldown = cmd.cooldown ?: return true
+        val time = cooldown.timeUnit.toMillis(cooldown.duration)
+        if (time <= 0) {
+            return true
         }
+
+        val entityId = when (cooldown.bucket) {
+            BucketType.USER -> ctx.author.idLong
+            BucketType.GUILD -> ctx.guild?.idLong
+            BucketType.GLOBAL -> -1
+        } ?: return true
+
+        if (cooldownProvider.tryAcquire(entityId, cooldown.bucket, time, cmd)) {
+            return true
+        }
+
+        val remainingTime = cooldownProvider.getCooldownTime(entityId, cooldown.bucket, cmd)
+        handleFailure(
+            CommandFailure.CooldownFailure(ctx, cmd, remainingTime)
+        ) { it.onCommandCooldown(ctx, cmd, remainingTime) }
+        return false
     }
 
     companion object {

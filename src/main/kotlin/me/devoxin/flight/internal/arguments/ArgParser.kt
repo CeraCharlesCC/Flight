@@ -8,6 +8,7 @@ import me.devoxin.flight.internal.parsers.Parser
 import me.devoxin.flight.internal.utils.EnumUtils
 import me.devoxin.flight.internal.utils.TextUtils
 import me.devoxin.flight.internal.utils.Tuple
+import java.math.BigDecimal
 import kotlin.reflect.KParameter
 
 class ArgParser(
@@ -196,15 +197,19 @@ class ArgParser(
             res is Number ->
                 when {
                     long.isNotEmpty() -> {
-                        val n = res.toLong()
+                        // Floating point values must not be truncated before checking integer bounds.
+                        val n = when (res) {
+                            is Float, is Double -> res.toDouble().takeIf { it.isFinite() }?.let(::BigDecimal)
+                            else -> BigDecimal.valueOf(res.toLong())
+                        } ?: return false to "`${arg.name}` must be a finite number"
 
                         return when (long.size) {
                             1 ->
-                                (n >= long[0]) to
+                                (n >= BigDecimal.valueOf(long[0])) to
                                         "`${arg.name}` must be at least ${long[0]} or bigger"
 
                             2 ->
-                                (n >= long[0] && n <= long[1]) to
+                                (n >= BigDecimal.valueOf(long[0]) && n <= BigDecimal.valueOf(long[1])) to
                                         "`${arg.name}` must be within range ${long.joinToString("-")}"
 
                             else -> false to "Invalid long range for `${arg.name}`"
@@ -304,10 +309,29 @@ class ArgParser(
         }
 
         if (resolved != null) {
-            return Tuple(true, resolved, null)
+            val converted = convertChoice(arg.type, resolved)
+                ?: return Tuple(
+                    false,
+                    null,
+                    "Choice `$res` for `${arg.name}` cannot be represented as ${arg.type.simpleName}."
+                )
+            return Tuple(true, converted, null)
         }
 
         return Tuple(true, null, null)
+    }
+
+    private fun convertChoice(type: Class<*>, value: Any): Any? = when {
+        value is Long && type == Int::class.javaObjectType ->
+            value.takeIf { it in Int.MIN_VALUE.toLong()..Int.MAX_VALUE.toLong() }?.toInt()
+
+        value is Double && type == Float::class.javaObjectType ->
+            value.takeIf { it.isFinite() && it in -Float.MAX_VALUE.toDouble()..Float.MAX_VALUE.toDouble() }
+                ?.toFloat()?.takeIf { value == 0.0 || it != 0.0f }
+
+        value is Double && !value.isFinite() -> null
+        type.isInstance(value) -> value
+        else -> null
     }
 
     companion object {

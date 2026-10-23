@@ -171,16 +171,14 @@ interface Context {
     }
 
     /**
-     * Waits for the given event. Only events that pass the given predicate will be returned.
-     * If the timeout is exceeded with no results then null will be returned.
+     * Waits for the given event or a subclass. Only events that pass the predicate will be returned.
+     * If the timeout expires, the future completes exceptionally with [java.util.concurrent.TimeoutException].
      *
      * @param predicate
      *        A function that must return a boolean denoting whether the event meets the given criteria.
      *
      * @param timeout
-     *        How long to wait, in milliseconds, for the given event type before expiring.
-     *
-     * @throws java.util.concurrent.TimeoutException
+     *        How long to wait in milliseconds. A value of zero or less disables the timeout.
      */
     fun <T : Event> waitFor(event: Class<T>, predicate: (T) -> Boolean, timeout: Long): CompletableFuture<T> {
         return commandClient.waitFor(event, predicate, timeout)

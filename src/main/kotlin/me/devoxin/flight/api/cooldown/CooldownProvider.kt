@@ -20,5 +20,9 @@ interface CooldownProvider {
 
     fun shutdown()
 
+    /**
+     * Atomically starts a cooldown of [time] milliseconds if the previous cooldown has expired.
+     * Returns false without changing the cooldown when another invocation already holds it.
+     */
     fun tryAcquire(id: Long, bucketType: BucketType, time: Long, command: CommandFunction): Boolean
 }

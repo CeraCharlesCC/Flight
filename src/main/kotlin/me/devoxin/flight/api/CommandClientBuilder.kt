@@ -258,16 +258,13 @@ class CommandClientBuilder {
         ArgParser.parsers[java.lang.Long::class.java] = longParser
 
         // JDA entities
-        val inviteParser = InviteParser()
-        ArgParser.parsers[Invite::class.java] = inviteParser
-        ArgParser.parsers[net.dv8tion.jda.api.entities.Invite::class.java] = inviteParser
-
         ArgParser.parsers[Member::class.java] = MemberParser()
         ArgParser.parsers[Role::class.java] = RoleParser()
         ArgParser.parsers[User::class.java] = UserParser()
         GuildChannelParsers.registerDefaults(ArgParser.parsers)
 
         // Custom entities
+        ArgParser.parsers[Invite::class.java] = InviteParser()
         ArgParser.parsers[Emoji::class.java] = EmojiParser.forEmoji()
         ArgParser.parsers[EmojiUnion::class.java] = EmojiParser.forEmojiUnion()
         ArgParser.parsers[UnicodeEmoji::class.java] = EmojiParser.forUnicodeEmoji()

@@ -4,6 +4,7 @@ import me.devoxin.flight.api.CommandFunction
 import me.devoxin.flight.api.localization.CommandLocalizationProvider
 import me.devoxin.flight.api.sync.CommandSyncScope
 import me.devoxin.flight.api.util.ObjectStorage
+import me.devoxin.flight.internal.arguments.ArgParser
 import me.devoxin.flight.internal.entities.Jar
 import me.devoxin.flight.internal.sync.CommandDataFactory
 import me.devoxin.flight.internal.sync.CommandTargetBucketer
@@ -12,6 +13,8 @@ import me.devoxin.flight.internal.utils.Indexer
 import net.dv8tion.jda.api.interactions.commands.Command as JdaCommand
 import net.dv8tion.jda.api.interactions.commands.build.CommandData
 import org.slf4j.LoggerFactory
+import java.util.Collections
+import java.util.IdentityHashMap
 
 class CommandRegistry {
     val objectStorage = ObjectStorage()
@@ -119,7 +122,7 @@ class CommandRegistry {
     }
 
     fun findCommandsByCog(cog: Cog): List<CommandFunction> {
-        return registeredCommands.filter { it.cog == cog }
+        return registeredCommands.filter { it.cog === cog }
     }
 
     fun unload(commandFunction: CommandFunction) {
@@ -129,7 +132,7 @@ class CommandRegistry {
     }
 
     fun unload(cog: Cog) {
-        val commands = registeredCommands.filter { it.cog == cog }
+        val commands = registeredCommands.filter { it.cog === cog }
         registeredCommands.removeAll(commands)
         rebuildIndexes()
 
@@ -215,6 +218,18 @@ class CommandRegistry {
         stagedApplicationCommands: Map<ApplicationCommandKey, CommandFunction>
     ) {
         if (command.isPrefixCapable) {
+            for (argument in command.arguments) {
+                if (argument.type == net.dv8tion.jda.api.entities.Invite::class.java &&
+                    argument.type !in ArgParser.parsers
+                ) {
+                    throw IllegalStateException(
+                        "Cannot register message command '${command.name}': ${argument.type.name} has no default parser. " +
+                            "Use me.devoxin.flight.api.arguments.types.Invite and resolve it explicitly, " +
+                            "or register a custom parser returning a JDA Invite before registering the command."
+                    )
+                }
+            }
+
             val triggers = linkedSetOf(command.normalizedName)
             triggers += command.properties.aliases
 
@@ -307,10 +322,12 @@ class CommandRegistry {
     }
 
     private fun doUnload(cogs: Iterable<Cog>) {
-        val uniqueCogs = cogs.distinctBy(Cog::name)
+        val unloadedCogs = Collections.newSetFromMap(IdentityHashMap<Cog, Boolean>())
 
-        for (cog in uniqueCogs) {
-            doUnload(cog)
+        for (cog in cogs) {
+            if (unloadedCogs.add(cog)) {
+                doUnload(cog)
+            }
         }
     }
 
