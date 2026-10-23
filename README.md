@@ -1,135 +1,149 @@
 # Flight-jda6
-[![Release](https://jitpack.io/v/ceracharlescc/flight.svg)](https://jitpack.io/#ceracharlescc/flight)
-[![](https://jitci.com/gh/ceracharlescc/flight/svg)](https://jitci.com/gh/ceracharlescc/flight)
 
-Flight-jda6 is a lightweight yet powerful command handler and arg parser for JDA, in Kotlin. It offers numerous utilities and functions for assisting, and speeding up Discord Bot development, allowing you to spend less time on the boring bits, and more on the important bits. 
+[![Release](https://jitpack.io/v/CeraCharlesCC/Flight.svg)](https://jitpack.io/#CeraCharlesCC/Flight)
 
-## Quick Start
-Using Flight is easy. The first thing you need to do before you can start diving in to bot making is to import it into your project.
-```gradle
+Flight is a Kotlin command framework for JDA 6. It supports slash commands, context menus, optional message commands, typed argument parsers, and explicit command registration and synchronization.
+
+Requires Java 17+, Kotlin/JVM targeting Java 17, JDA 6, and JDA's `AnnotatedEventManager`. The examples describe the current source tree; use a release containing the APIs you need. See the [feature and migration guide](docs/new-feature-and-migration.md) for the full API walkthrough.
+
+## Installation
+
+Choose one publication source. Replace `VERSION` with a published release tag or package version. Add JDA separately because Flight declares it as a compile-only dependency.
+
+### JitPack (public, no token required)
+
+```kotlin
+// build.gradle.kts
 repositories {
-  maven { url 'https://jitpack.io' }
+  mavenCentral()
+  maven("https://m2.dv8tion.net/releases")
+  maven("https://jitpack.io")
 }
 
 dependencies {
-  compile 'com.github.ceracharlescc:Flight:VERSION'
+  implementation("com.github.CeraCharlesCC:Flight:VERSION")
+  implementation("net.dv8tion:JDA:6.1.2")
 }
 ```
-Make sure to replace `VERSION` with the latest Flight version. You can find a list of versions in the releases tab.
 
-### Command Client
-Now that importing Flight is out of the way, we can begin constructing our command client.
+Use the exact owner/repository casing shown above. JitPack maps this single-module project to `com.github.CeraCharlesCC:Flight`, even though the Gradle publication uses `flight-jda6`. These coordinates are confirmed by the [5.1.1 POM](https://jitpack.io/com/github/CeraCharlesCC/Flight/5.1.1/Flight-5.1.1.pom) and [module metadata](https://jitpack.io/com/github/CeraCharlesCC/Flight/5.1.1/Flight-5.1.1.module). See JitPack's [single-module coordinate rules](https://docs.jitpack.io/building/#multi-module-projects).
+
+### GitHub Packages
+
 ```kotlin
-val commandClient = CommandClient.builder()
-  .setPrefixes("!", "?") // You can use multiple prefixes with Flight.
-  .registerDefaultParsers() // This registers all default parsers that ship with Flight. This allows us to make use of Flight's arg-parsing capabilities.
-  .register( // Explicit registration is the primary workflow and works well with DI-managed cog instances.
-    UtilityCog(),
-    ModerationCog(moderationService)
-  )
-  .build() // There is a lot more we can configure, but the default values are fine for our needs.
+// build.gradle.kts
+repositories {
+  mavenCentral()
+  maven("https://m2.dv8tion.net/releases")
+  maven("https://maven.pkg.github.com/ceracharlescc/Flight") {
+    credentials {
+      username = System.getenv("GITHUB_USER")
+      password = System.getenv("GITHUB_TOKEN")
+    }
+    content { includeGroup("io.github.ceracharlescc") }
+  }
+}
 
-// Each builder option returns the Builder instance. This makes chaining calls easy.
+dependencies {
+  implementation("io.github.ceracharlescc:flight-jda6:VERSION")
+  implementation("net.dv8tion:JDA:6.1.2")
+}
 ```
 
-If your application constructs cogs through a DI container, module system, or service locator, you can bulk-register them directly:
-```kotlin
-val containerCogs: List<Cog> = container.resolveAll()
+Set `GITHUB_USER` to your GitHub username and `GITHUB_TOKEN` to a personal access token (classic) with `read:packages`. GitHub's Maven/Gradle registry [requires authentication even for public packages](https://docs.github.com/en/packages/working-with-a-github-packages-registry/working-with-the-gradle-registry#authenticating-to-github-packages). Choose a version available in GitHub Packages; a Git tag alone does not create that publication.
 
-val commandClient = CommandClient.builder()
-  .setPrefixes("!")
-  .registerDefaultParsers()
-  .registerAll(containerCogs)
-  .build()
-```
+## Quick start
 
-Now that we have our command client, we need to create our JDA client to connect our bot to Discord so we can start receiving and processing events.
+Commands live in cogs. Use `Context.respond(...)` for handlers shared by slash and message commands so interaction invocations are acknowledged correctly.
+
 ```kotlin
+import me.devoxin.flight.api.CommandClient
+import me.devoxin.flight.api.annotations.Command
+import me.devoxin.flight.api.command.Cog
+import me.devoxin.flight.api.context.Context
+import net.dv8tion.jda.api.JDABuilder
 import net.dv8tion.jda.api.hooks.AnnotatedEventManager
+import net.dv8tion.jda.api.requests.GatewayIntent
 
-val jda = JDABuilder(yourBotToken)
-  .setEventManager(AnnotatedEventManager()) // Required: Flight-jda6 now uses @SubscribeEvent.
-  .addEventListeners(commandClient) // Register commandClient so it can process commands and waitFor events.
-  .build()
-```
-
-> **Breaking change:** `CommandClient` is now supported only with `AnnotatedEventManager`.
-> `InterfacedEventManager` is not supported.
-
-### Commands
-Now for the part you've been waiting for -- commands!
-Commands need to be contained inside a `Cog`. The cog serves not only as the container, but the category too -- so you can group commands based on what they do, for example; moderation. However we'll just be sticking with the basic `ping` command for now.
-```kotlin
-class YourCog : Cog { // "YourCog" will be used as the category name for commands within this cog.
-
+class UtilityCog : Cog {
   @Command(description = "Ping, pong!")
   fun ping(ctx: Context) {
-    ctx.send("Pong!")
+    ctx.respond("Pong!")
   }
-
 }
+
+val commandClient = CommandClient.builder()
+  .setPrefixes("!", "?")
+  .registerDefaultParsers()
+  .register(UtilityCog())
+  .useDefaultErrorHandler()
+  .build()
+
+val jda = JDABuilder.createDefault(yourBotToken)
+  .enableIntents(GatewayIntent.MESSAGE_CONTENT) // for the prefix commands below
+  .setEventManager(AnnotatedEventManager())
+  .addEventListeners(commandClient)
+  .build()
+  .awaitReady()
+
+// Explicitly publish the registered slash commands and context menus to Discord.
+val syncResult = commandClient.syncCommands(jda).join()
 ```
 
-#### Subcommands
-Flight supports subcommands out-of-the-box, which can simplify command structure and parsing. Subcommands are functionally similar to commands, however there are a few restrictions. A subcommand's parent Cog **must** contain exactly **1** top-level command. Subcommands also inherit the permission requirements of their parent command. Subcommands **cannot** be attached to other subcommands.
-Top-level commands support an infinite number of subcommands.
+Register all cogs before syncing. Sync replaces the complete application-command set in each targeted scope, including when the payload is empty. Inspect `commandClient.planCommandSync()` first when you need to review the desired state. A guild-only sync must set `CommandSyncOptions(includeGlobal = false, guildIds = setOf(guildId))`; guild IDs filter guild scopes and do not move global commands into a guild. See [command sync](docs/new-feature-and-migration.md#command-sync).
+
+Flight requires `AnnotatedEventManager`; `InterfacedEventManager` is unsupported. The prefix-command example enables `MESSAGE_CONTENT`; enable the Message Content Intent in the Discord Developer Portal for your bot too.
+
+### Registering cogs
+
+Register the exact instances your application constructs, including those supplied by dependency injection:
+
 ```kotlin
-package my.bot.commands
+val cogs: List<Cog> = container.resolveAll()
 
-class SubcommandDemo : Cog {
-
-  // The permission requirement seen below is enforced for the top-level command, and any subcommands it may have.
-  @Command(description = "Configure bot settings", userPermissions = [Permission.MANAGE_SERVER])
-  fun settings(ctx: Context) {
-    // This is the top-level command. It will only be invoked when a user does not specify a (valid) subcommand.
-    ctx.send("Hey! You must specify a subcommand.\nAvailable subcommands:\n`prefix` `locale`")
-  }
-  
-  @SubCommand(description = "Set the server prefix")
-  fun prefix(ctx: Context, newPrefix: String) {
-    Database.updatePrefix(ctx.guild!!.idLong, newPrefix)
-    ctx.send("The prefix was changed to `$newPrefix`.")
-  }
-  
-  @SubCommand(description = "Set the language of the bot for the server.")
-  fun locale(ctx: Context, newLocale: String) {
-    val selectedLocale = validateLocale(newLocale)
-        ?: return ctx.send("That doesn't appear to be a valid locale.")
-    Database.updateLocale(ctx.guild!!.idLong, selectedLocale)
-    ctx.send("The locale was changed to ${selectedLocale.flag} `${selectedLocale.asIso}`.")
-  }
-
-}
-```
-To execute our new subcommand, we would need to type `!settings prefix`. To pass a prefix, we just need to provide a second argument: `!settings prefix ?`.
-Change the `!` as necessary to match your bot's prefix.
-
-#### Registering
-You now have your first cog and command, all that's left to do is register it.
-
-The recommended approach is to register the exact cog instances you want to use when you build the client:
-```kotlin
 val commandClient = CommandClient.builder()
   .setPrefixes("!")
   .registerDefaultParsers()
-  .register(YourCog())
+  .registerAll(cogs)
   .build()
 ```
 
-You can also register multiple DI-managed cogs in one call:
-```kotlin
-val commandClient = CommandClient.builder()
-  .setPrefixes("!")
-  .registerDefaultParsers()
-  .registerAll(listOf(YourCog(), AdminCog(adminService)))
-  .build()
-```
+Package scanning remains an optional convenience when Flight should construct the cogs itself:
 
-Package scanning still exists as an optional convenience if you want Flight to discover and construct cogs for you:
 ```kotlin
 commandClient.commands.register("my.bot.commands")
 ```
 
-If done correctly, all cogs and commands contained within `my.bot.commands` will be scanned and registered ready for use.
+Register scanned cogs before calling `syncCommands(...)` too.
 
-> If you want to provide your own `help` command, disable Flight's default help command before registering your cog.
+### Subcommands and groups
+
+Attach subcommands to a named top-level command with `parent`. A cog can contain multiple top-level commands; grouped subcommands also specify `group` and require a matching `@SubCommandGroup` on the parent. Permission requirements on the parent apply to its subcommands.
+
+```kotlin
+import me.devoxin.flight.api.annotations.SubCommand
+import me.devoxin.flight.api.annotations.SubCommandGroup
+import net.dv8tion.jda.api.Permission
+
+class SettingsCog : Cog {
+  @Command(description = "Server settings", userPermissions = [Permission.MANAGE_SERVER])
+  @SubCommandGroup(name = "display", description = "Display settings")
+  fun settings(ctx: Context) {
+    ctx.respond("Choose a settings subcommand.")
+  }
+
+  @SubCommand(parent = "settings", description = "Show the server prefix")
+  fun prefix(ctx: Context) {
+    ctx.respond("The default prefix is !")
+  }
+
+  @SubCommand(parent = "settings", group = "display", description = "Show the language")
+  fun locale(ctx: Context) {
+    ctx.respond("The default language is English.")
+  }
+}
+```
+
+These commands are invoked as `/settings prefix` or `/settings display locale`, or with the configured message prefix. Slash-command parents with subcommands act as containers; Discord invokes the selected child. A top-level slash command can have root options or subcommands/groups, but cannot mix both.
+
+For autocomplete, centralized error handlers, parsers, and migration details, see the [feature and migration guide](docs/new-feature-and-migration.md).

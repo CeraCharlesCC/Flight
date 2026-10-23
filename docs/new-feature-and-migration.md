@@ -1,8 +1,8 @@
-# Flight 5.0 for JDA 6
+# Flight 5 for JDA 6
 
 Flight is a Kotlin command framework for JDA 6 with an interaction-first runtime model, explicit command registration, command sync utilities, typed autocomplete handlers, and optional message-command parsing.
 
-This branch targets the current Flight 5.0 model:
+This guide describes the current source tree. Use a release containing the APIs you need; older tags may differ. The current Flight 5 model includes:
 
 - explicit cog registration is the primary workflow
 - slash commands and context menus are first-class
@@ -14,15 +14,18 @@ This branch targets the current Flight 5.0 model:
 ## Requirements
 
 - Java 17+
-- Kotlin/JVM 17+
+- Kotlin/JVM targeting Java 17
 - JDA 6
 - `AnnotatedEventManager` for event dispatch
 
 ## Installation
 
-The published artifact name is `flight-jda6`.
+Choose one publication source. Replace `VERSION` with a published release tag or package version. Add JDA separately because Flight declares it as a compile-only dependency.
+
+### JitPack (public, no token required)
 
 ```kotlin
+// build.gradle.kts
 repositories {
   mavenCentral()
   maven("https://m2.dv8tion.net/releases")
@@ -30,11 +33,36 @@ repositories {
 }
 
 dependencies {
-  implementation("io.github.ceracharlescc:flight-jda6:5.0.0")
+  implementation("com.github.CeraCharlesCC:Flight:VERSION")
+  implementation("net.dv8tion:JDA:6.1.2")
 }
 ```
 
-If you consume a private or fork-specific publication, keep the same artifact name and use the repository coordinates appropriate for that publication source.
+Use the exact owner/repository casing shown above. JitPack maps this single-module project to `com.github.CeraCharlesCC:Flight`, even though the Gradle publication uses `flight-jda6`. These coordinates are confirmed by the [5.1.1 POM](https://jitpack.io/com/github/CeraCharlesCC/Flight/5.1.1/Flight-5.1.1.pom) and [module metadata](https://jitpack.io/com/github/CeraCharlesCC/Flight/5.1.1/Flight-5.1.1.module). See JitPack's [single-module coordinate rules](https://docs.jitpack.io/building/#multi-module-projects).
+
+### GitHub Packages
+
+```kotlin
+// build.gradle.kts
+repositories {
+  mavenCentral()
+  maven("https://m2.dv8tion.net/releases")
+  maven("https://maven.pkg.github.com/ceracharlescc/Flight") {
+    credentials {
+      username = System.getenv("GITHUB_USER")
+      password = System.getenv("GITHUB_TOKEN")
+    }
+    content { includeGroup("io.github.ceracharlescc") }
+  }
+}
+
+dependencies {
+  implementation("io.github.ceracharlescc:flight-jda6:VERSION")
+  implementation("net.dv8tion:JDA:6.1.2")
+}
+```
+
+Set `GITHUB_USER` to your GitHub username and `GITHUB_TOKEN` to a personal access token (classic) with `read:packages`. GitHub's Maven/Gradle registry [requires authentication even for public packages](https://docs.github.com/en/packages/working-with-a-github-packages-registry/working-with-the-gradle-registry#authenticating-to-github-packages). Choose a version available in GitHub Packages; a Git tag alone does not create that publication.
 
 ## Quick start
 
@@ -44,6 +72,7 @@ Create a `CommandClient`, register your cogs explicitly, then add the client as 
 import me.devoxin.flight.api.CommandClient
 import net.dv8tion.jda.api.JDABuilder
 import net.dv8tion.jda.api.hooks.AnnotatedEventManager
+import net.dv8tion.jda.api.requests.GatewayIntent
 
 val commandClient = CommandClient.builder()
   .setPrefixes("!", "?")
@@ -56,10 +85,16 @@ val commandClient = CommandClient.builder()
   .build()
 
 val jda = JDABuilder.createDefault(token)
+  .enableIntents(GatewayIntent.MESSAGE_CONTENT) // for the prefix commands below
   .setEventManager(AnnotatedEventManager())
   .addEventListeners(commandClient)
   .build()
+  .awaitReady()
+
+val syncResult = commandClient.syncCommands(jda).join()
 ```
+
+Enable the Message Content Intent in the Discord Developer Portal for the prefix-command example above. Register every cog before syncing. Sync replaces the full application-command set in each targeted scope; review `planCommandSync()` first if necessary.
 
 ### Why explicit registration is the default path
 
@@ -135,7 +170,7 @@ For context menus, Flight can inject the selected `User` or `Message` target dir
 
 ## Subcommands and groups
 
-Flight 5.0 uses an explicit `parent` / `group` model.
+Flight 5 uses an explicit `parent` / `group` model.
 
 ```kotlin
 class AdminCog : Cog {
@@ -241,7 +276,10 @@ for (target in plan.targets) {
 
 ### Execute the sync
 
+After JDA is ready and all cogs are registered:
+
 ```kotlin
+jda.awaitReady()
 val result = commandClient.syncCommands(jda)
   .join()
 
@@ -258,10 +296,13 @@ import me.devoxin.flight.api.sync.CommandSyncOptions
 val guildOnlyPlan = commandClient.planCommandSync(
   CommandSyncOptions(
     dryRun = true,
+    includeGlobal = false,
     guildIds = setOf(123456789012345678L)
   )
 )
 ```
+
+`guildIds` filters guild scopes; it does not disable global sync or copy global commands into a guild. Use `@GuildIds` on commands that should belong to a guild. A guild-only operation requires `includeGlobal = false`.
 
 Important sync behavior:
 
@@ -272,7 +313,7 @@ Important sync behavior:
 
 ## Error handling
 
-Flight 5.0 has a builder-level centralized error-handler API.
+Flight 5 has a builder-level centralized error-handler API.
 
 ### Recommended: install the standard handler
 
@@ -444,3 +485,20 @@ If you are updating older Flight usage, the biggest changes are:
 
 7. **Default adapter behavior is intentionally quiet**
    - install your own centralized handler or the standard handler for user-facing responses
+
+8. **JDA invite arguments need an explicit choice**
+   - use `me.devoxin.flight.api.arguments.types.Invite` with Flight's default parsers
+   - call `resolveAsync()` when you need the resolved JDA invite
+   - a parameter typed as `net.dv8tion.jda.api.entities.Invite` requires your own parser
+
+## Building and release versions
+
+Run `./gradlew clean build` to compile and run the tests. Push and pull-request CI runs the build and validates local Maven publication; JitPack also runs the build before publishing to its local Maven repository.
+
+The GitHub Packages workflow runs when a release is published. Its numeric tag supplies the Maven version, with an optional leading `v` removed (`5.1.1` and `v5.1.1` both publish `5.1.1`). JitPack uses its exact requested tag or commit as `VERSION`. Both paths override Gradle's version with `-Pversion=...`, including the embedded Flight version. The value in `gradle.properties` remains the fallback for ordinary local builds.
+
+To inspect the Maven publication locally without uploading it:
+
+```sh
+./gradlew build publishToMavenLocal -Pversion=5.1.1
+```
