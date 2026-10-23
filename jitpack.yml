@@ -2,4 +2,4 @@ jdk:
   - openjdk17
 
 install:
-  - ./gradlew clean :shadowJar publishToMavenLocal
+  - ./gradlew clean build publishToMavenLocal -Pversion="$VERSION"
